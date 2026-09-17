@@ -163,6 +163,7 @@ The JSON format is identical across all three — copy the file from one machine
 
 - **Pokémon theme.** Preferences → Visual style → **Pokémon**: Pokédex-red chrome, a faint Poké Ball desk, Poké Balls instead of pushpins, pixel-font note titles (Japanese titles keep the normal font).
 - **Partner Pokémon.** Preferences → Partner Pokémon → **On** (switching to the Pokémon theme turns it on the first time). It strolls along the bottom of the desk, hops when you create a note, shakes when you delete one, spins when you pin one, and bobs while a note is being read aloud. Click it to hear its Japanese name; right-click to choose another, pick at random, or hide it.
+- **A Pokémon on every note.** In the Pokémon theme each note gets its own Pokémon, picked from the note's id so it never changes (Preferences → Pokémon on every note, available in any theme).
 - **Note stickers.** Right-click a note → **Add Pokémon…** (search by English name, カタカナ/ひらがな, or Dex number), **Random Pokémon**, or **Remove Pokémon**. The sticker is saved with the note.
 
 Sprites are the Pokémon HOME renders from [PokeAPI/sprites](https://github.com/PokeAPI/sprites). They are not shipped in this repo: the app downloads each one the first time it is shown and keeps it in `pokemon-sprites/` next to `notes.json`, so they work offline afterwards. Pokémon and its sprites are © Nintendo / Creatures / GAME FREAK; this is an unofficial fan feature.

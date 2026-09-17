@@ -116,7 +116,7 @@ function PokemonPicker({ T, title = 'Choose a Pokémon', current, onPick, onClos
 /* ---------- note sticker ---------- */
 // Sits in the note's bottom-right corner above the footer. pointer-events
 // none so it never steals a click, drag, or text selection from the note.
-function PokemonSticker({ id, size = 64 }) {
+function PokemonSticker({ id, size = 54 }) {
   if (!isPokemonId(id)) return null;
   return (
     <div data-pokemon-sticker={id} style={{ position: 'absolute', right: 8, bottom: 26, pointerEvents: 'none', zIndex: 2,

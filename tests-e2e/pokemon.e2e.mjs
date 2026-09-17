@@ -20,7 +20,8 @@ before(async () => {
       folders: { root: { id: 'root', name: 'All notes', parent: null, hue: '#888' }, f: { id: 'f', name: 'F', parent: 'root', hue: '#5a82c9' } },
       notes: [
         { id: 'with', folder: 'f', title: 'With', body: 'has a sticker', color: 'yellow', x: 40, y: 40, w: 300, h: 220, z: 1, pinned: true, pokemon: 25 },
-        { id: 'without', folder: 'f', title: 'Without', body: 'no sticker yet', color: 'blue', x: 420, y: 40, w: 300, h: 220, z: 2, pinned: false },
+        { id: 'without', folder: 'f', title: 'Without', body: 'sticker removed', color: 'blue', x: 420, y: 40, w: 300, h: 220, z: 2, pinned: false, pokemon: 0 },
+        { id: 'auto', folder: 'f', title: 'Auto', body: 'never picked one', color: 'green', x: 800, y: 40, w: 300, h: 220, z: 3, pinned: false },
       ],
       links: [], cwd: 'root', view: { x: 0, y: 0, z: 1 }, drawer: false, folderOrder: ['f'],
     },
@@ -35,6 +36,13 @@ const savedNotes = () => JSON.parse(fs.readFileSync(path.join(app.userData, 'not
 test('a note sticker renders from the sprite cache over sticky-pokemon://', async () => {
   await app.pollUntil(() => loaded('[data-pokemon-sticker="25"] img'), { timeout: 5000, interval: 50, label: 'sticker sprite' });
   assert.equal(await app.evaljs(`document.querySelector('[data-pokemon-sticker="25"] img').src`), 'sticky-pokemon://25.png');
+  assert.equal(await app.evaljs(`!!document.querySelector('[data-note-id="without"] [data-pokemon-sticker]')`), false);
+});
+
+test('in the Pokémon theme a note that never picked one gets its own; a removed one stays gone', async () => {
+  const expected = await app.evaljs(`pokemonForNoteId('auto')`);
+  const shown = await app.evaljs(`document.querySelector('[data-note-id="auto"] [data-pokemon-sticker]')?.dataset.pokemonSticker`);
+  assert.equal(Number(shown), expected);
   assert.equal(await app.evaljs(`!!document.querySelector('[data-note-id="without"] [data-pokemon-sticker]')`), false);
 });
 

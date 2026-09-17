@@ -1154,6 +1154,26 @@ function pokemonSpriteUrl(n) {
 function randomPokemonId(rand = Math.random) {
   return 1 + Math.floor(rand() * POKEMON_COUNT);
 }
+// Every note's own Pokémon when "Pokémon on every note" is on: derived from
+// the note id (FNV-1a), so a note keeps the same one forever and nothing is
+// written to notes.json. note.pokemon overrides it: a Dex number is an
+// explicit pick, 0 means "no Pokémon on this note".
+function pokemonForNoteId(id) {
+  let h = 0x811c9dc5;
+  for (const ch of String(id)) { h ^= ch.codePointAt(0); h = Math.imul(h, 0x01000193); }
+  return 1 + ((h >>> 0) % POKEMON_COUNT);
+}
+function notePokemon(note, everyNote) {
+  if (!note) return null;
+  if (note.pokemon === 0) return null;
+  if (isPokemonId(note.pokemon)) return note.pokemon;
+  return everyNote ? pokemonForNoteId(note.id) : null;
+}
+// The preference defaults to on while the Pokémon theme is active.
+function pokemonOnEveryNote(tweaks) {
+  const t = tweaks || {};
+  return typeof t.pokemonEveryNote === 'boolean' ? t.pokemonEveryNote : t.theme === 'pokemon';
+}
 // Hiragana → katakana, so 「ぴかちゅう」 finds ピカチュウ.
 function toKatakana(s) {
   return s.replace(/[ぁ-ゖ]/g, ch => String.fromCharCode(ch.charCodeAt(0) + 0x60));
@@ -1481,4 +1501,4 @@ function downloadUrlForPlatform(version) {
 }
 const MOBILE_BANNER_DISMISSED_KEY = 'stickies.mobileBannerDismissed';
 const MOBILE_BANNER_MAX_WIDTH = 640;
-Object.assign(window, { POKEMON_COUNT, isPokemonId, pokemonName, pokemonSpriteUrl, randomPokemonId, searchPokemon, toKatakana, SPEECH_MAX_CHARS, hasJapanese, speechTextFromBody, CLIPBOARD_IMAGE_BYTES, FOLDER_HUES, HOVER_ALPHA, MOBILE_BANNER_DISMISSED_KEY, MOBILE_BANNER_MAX_WIDTH, NOTE_COLORS, SEED, STICKY_CLIPBOARD_MARKER, TWEAK_DEFAULTS, WHATS_NEW_ID, ZOOM_MAX, ZOOM_MIN, canMoveFolder, canvasPasteAction, clipboardImagesFor, clipboardTextToNotes, cmpSemver, downloadJSON, downloadNoteAsMarkdown, downloadUrlForPlatform, editLinkOnPaste, editListOnEnter, editListOnTab, editQuoteOnPaste, flattenFolderTree, flattenPreviewText, folderPath, folderSubtreeIds, hashRot, hasTextSelection, hexChannels, hoverBg, hoverInk, imageMimeForFile, imageRefsInNotes, isDarkSurface, markdownFileBody, markdownFileTitle, markdownFileToNote, markdownVisibleText, mdToHtml, mixHex, normHex, noteDownloadFilename, notesToClipboardText, noteToMarkdown, openWebLink, pickJSONFile, pickMarkdownFiles, renderedWordAt, sanitizeFolderParents, sourceCaretForPreviewClick, sourceOffsetForWord, themeTokens, uid, whatsNewInfo, withA, withDefaults, zoomActionForKey, zoomViewAt });
+Object.assign(window, { pokemonForNoteId, notePokemon, pokemonOnEveryNote, POKEMON_COUNT, isPokemonId, pokemonName, pokemonSpriteUrl, randomPokemonId, searchPokemon, toKatakana, SPEECH_MAX_CHARS, hasJapanese, speechTextFromBody, CLIPBOARD_IMAGE_BYTES, FOLDER_HUES, HOVER_ALPHA, MOBILE_BANNER_DISMISSED_KEY, MOBILE_BANNER_MAX_WIDTH, NOTE_COLORS, SEED, STICKY_CLIPBOARD_MARKER, TWEAK_DEFAULTS, WHATS_NEW_ID, ZOOM_MAX, ZOOM_MIN, canMoveFolder, canvasPasteAction, clipboardImagesFor, clipboardTextToNotes, cmpSemver, downloadJSON, downloadNoteAsMarkdown, downloadUrlForPlatform, editLinkOnPaste, editListOnEnter, editListOnTab, editQuoteOnPaste, flattenFolderTree, flattenPreviewText, folderPath, folderSubtreeIds, hashRot, hasTextSelection, hexChannels, hoverBg, hoverInk, imageMimeForFile, imageRefsInNotes, isDarkSurface, markdownFileBody, markdownFileTitle, markdownFileToNote, markdownVisibleText, mdToHtml, mixHex, normHex, noteDownloadFilename, notesToClipboardText, noteToMarkdown, openWebLink, pickJSONFile, pickMarkdownFiles, renderedWordAt, sanitizeFolderParents, sourceCaretForPreviewClick, sourceOffsetForWord, themeTokens, uid, whatsNewInfo, withA, withDefaults, zoomActionForKey, zoomViewAt });

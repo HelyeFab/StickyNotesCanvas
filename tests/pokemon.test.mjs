@@ -11,7 +11,7 @@ const sandbox = { React: {}, window: {}, document: {}, navigator: {}, console, M
 vm.createContext(sandbox);
 vm.runInContext(fs.readFileSync(path.join(dir, '..', 'pokemon-names.js'), 'utf8'), sandbox);
 vm.runInContext(fs.readFileSync(path.join(dir, '..', 'utils.jsx'), 'utf8'), sandbox);
-const { POKEMON_COUNT, POKEMON_NAMES, isPokemonId, pokemonName, pokemonSpriteUrl, randomPokemonId, searchPokemon } = sandbox.window;
+const { pokemonForNoteId, notePokemon, pokemonOnEveryNote, POKEMON_COUNT, POKEMON_NAMES, isPokemonId, pokemonName, pokemonSpriteUrl, randomPokemonId, searchPokemon } = sandbox.window;
 const arr = (a) => Array.from(a);
 
 test('the names table covers the whole National Dex in order', () => {
@@ -64,4 +64,27 @@ test('sprite URL: app protocol on desktop, PokeAPI repo in the browser', () => {
   sandbox.window.stickyAPI = {};
   try { assert.equal(pokemonSpriteUrl(25), 'sticky-pokemon://25.png'); }
   finally { delete sandbox.window.stickyAPI; }
+});
+
+test('every note gets its own Pokémon, stable for its id', () => {
+  const a = pokemonForNoteId('n_knivp9');
+  assert.ok(isPokemonId(a));
+  assert.equal(pokemonForNoteId('n_knivp9'), a, 'same id, same Pokémon');
+  const spread = new Set(['n_a', 'n_b', 'n_c', 'n_d', 'n_e', 'n_f', 'n_g', 'n_h'].map(pokemonForNoteId));
+  assert.ok(spread.size >= 6, 'different notes mostly get different Pokémon');
+});
+
+test('notePokemon: explicit pick wins, 0 removes, otherwise the auto one only when enabled', () => {
+  assert.equal(notePokemon({ id: 'x', pokemon: 25 }, false), 25);
+  assert.equal(notePokemon({ id: 'x', pokemon: 25 }, true), 25);
+  assert.equal(notePokemon({ id: 'x', pokemon: 0 }, true), null);
+  assert.equal(notePokemon({ id: 'x' }, false), null);
+  assert.equal(notePokemon({ id: 'x' }, true), pokemonForNoteId('x'));
+});
+
+test('"Pokémon on every note" defaults to on in the Pokémon theme only', () => {
+  assert.equal(pokemonOnEveryNote({ theme: 'pokemon' }), true);
+  assert.equal(pokemonOnEveryNote({ theme: 'paper' }), false);
+  assert.equal(pokemonOnEveryNote({ theme: 'pokemon', pokemonEveryNote: false }), false);
+  assert.equal(pokemonOnEveryNote({ theme: 'flat', pokemonEveryNote: true }), true);
 });

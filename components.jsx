@@ -1514,6 +1514,7 @@ function StickyNote({note, T, tweaks, folder, refCb, selected, selectedIds, setS
   const [speech, setSpeech] = useState('idle');
   // Pokémon sticker in the note's corner (note.pokemon = National Dex number).
   const [pickingPokemon, setPickingPokemon] = useState(false);
+  const pokemonId = notePokemon(note, pokemonOnEveryNote(tweaks));
   const [speechError, setSpeechError] = useState('');
   const canSpeak = !!window.stickyAPI?.ttsConfigured && hasJapanese(note.body);
   useEffect(() => () => { if (speechOwner === setSpeech) stopSpeech(); }, []);
@@ -2325,9 +2326,9 @@ function StickyNote({note, T, tweaks, folder, refCb, selected, selectedIds, setS
           background: `linear-gradient(135deg, transparent 40%, ${withA(ink,0.25)} 40%, ${withA(ink,0.25)} 50%, transparent 50%, transparent 60%, ${withA(ink,0.25)} 60%, ${withA(ink,0.25)} 70%, transparent 70%)`,
         }}/>
 
-      <PokemonSticker id={note.pokemon}/>
+      <PokemonSticker id={pokemonId}/>
       {pickingPokemon && (
-        <PokemonPicker T={T} title="Add a Pokémon to this note" current={note.pokemon}
+        <PokemonPicker T={T} title="Choose this note's Pokémon" current={pokemonId}
           onPick={(pid)=>{ onSnapshot && onSnapshot(); onChange({pokemon: pid}); }}
           onClose={()=>setPickingPokemon(false)}/>
       )}
@@ -2356,9 +2357,9 @@ function StickyNote({note, T, tweaks, folder, refCb, selected, selectedIds, setS
             {label:'Edit title', onClick:()=>setEditingTitle(true)},
             {label:'Edit body', onClick:()=>setEditing(true)},
             {label:'Insert image…', onClick:()=>insertImageFromPicker()},
-            {label: isPokemonId(note.pokemon) ? 'Change Pokémon…' : 'Add Pokémon…', onClick:()=>setPickingPokemon(true)},
+            {label: pokemonId ? 'Change Pokémon…' : 'Add Pokémon…', onClick:()=>setPickingPokemon(true)},
             {label:'Random Pokémon', onClick:()=>{ onSnapshot && onSnapshot(); onChange({pokemon: randomPokemonId()}); }},
-            isPokemonId(note.pokemon) ? {label:'Remove Pokémon', onClick:()=>{ onSnapshot && onSnapshot(); onChange({pokemon: undefined}); }} : null,
+            pokemonId ? {label:'Remove Pokémon', onClick:()=>{ onSnapshot && onSnapshot(); onChange({pokemon: 0}); }} : null,
             {label: note.pinned?'Unpin':'Pin to top', onClick:()=>{ if (onTogglePin) onTogglePin(); else onChange({pinned:!note.pinned}); }},
             {divider:true},
             {label:'Link to note ▶', submenu: candidates.map(n => ({
@@ -3106,6 +3107,10 @@ function TweakPanel({T, tweaks, update, onClose, onImportFromImage}) {
         v==='pokemon' && tweaks.showPartner===undefined ? {theme:v, showPartner:true, partner:25} : {theme:v}
       )} options={[
         {id:'paper',label:'Paper'},{id:'flat',label:'Flat'},{id:'terminal',label:'Terminal'},{id:'pokemon',label:'Pokémon'}
+      ]}/>
+      <Label>Pokémon on every note</Label>
+      <Segmented T={T} value={pokemonOnEveryNote(tweaks) ? 'on' : 'off'} onChange={v=>update({pokemonEveryNote: v==='on'})} options={[
+        {id:'off',label:'Off'},{id:'on',label:'On'}
       ]}/>
       <Label>Partner Pokémon</Label>
       <Segmented T={T} value={tweaks.showPartner ? 'on' : 'off'} onChange={v=>update({showPartner: v==='on'})} options={[
