@@ -1,6 +1,19 @@
 #!/bin/sh
 set -e
 
+# This script replaces electron-builder's default after-install, which is what
+# sets up Chromium's sandbox helper. Without it, on distros that restrict
+# unprivileged user namespaces (Ubuntu 24.04+), the app aborts at launch:
+# "The SUID sandbox helper binary was found, but is not configured correctly".
+# Always SUID, as Chrome's own .deb does: electron-builder's "can I unshare?"
+# probe passes on Ubuntu (unshare has its own AppArmor allowance) while
+# Electron itself is still refused.
+SANDBOX='/opt/Sticky Notes/chrome-sandbox'
+if [ -f "$SANDBOX" ]; then
+  chown root:root "$SANDBOX" || true
+  chmod 4755 "$SANDBOX" || true
+fi
+
 if command -v update-desktop-database >/dev/null 2>&1; then
   update-desktop-database -q || true
 fi
