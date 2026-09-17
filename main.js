@@ -262,6 +262,53 @@ function loadTtsConfig() {
 
 ipcMain.on('tts:configured-sync', (e) => { e.returnValue = !!loadTtsConfig(); });
 
+// Spoken clips persist under userData/tts-cache/, one file per distinct
+// (server, voice, speed, model, text), so anything said once replays with no
+// API call — across restarts too. The key is deliberately not part of the
+// name: rotating it must not throw the cache away. Oldest clips (by last
+// play) are pruned past TTS_CACHE_MAX_FILES.
+const ttsCacheDir = () => path.join(userDataDir(), 'tts-cache');
+const TTS_CACHE_MAX_FILES = 2000;
+const TTS_EXT_BY_MIME = { 'audio/mpeg': 'mp3', 'audio/mp3': 'mp3', 'audio/wav': 'wav', 'audio/x-wav': 'wav', 'audio/wave': 'wav', 'audio/ogg': 'ogg', 'audio/opus': 'opus', 'audio/aac': 'aac', 'audio/flac': 'flac' };
+const TTS_MIME_BY_EXT = { mp3: 'audio/mpeg', wav: 'audio/wav', ogg: 'audio/ogg', opus: 'audio/opus', aac: 'audio/aac', flac: 'audio/flac' };
+function ttsCacheName(c, text) {
+  return require('node:crypto').createHash('sha256')
+    .update(JSON.stringify([c.url, c.voice, c.speed, c.model, text])).digest('hex').slice(0, 32);
+}
+function readTtsCache(name) {
+  try {
+    const hit = fs.readdirSync(ttsCacheDir()).find(f => f.startsWith(name + '.'));
+    if (!hit) return null;
+    const file = path.join(ttsCacheDir(), hit);
+    const audio = new Uint8Array(fs.readFileSync(file));
+    if (!audio.length) return null;
+    const now = new Date();
+    try { fs.utimesSync(file, now, now); } catch {}      // mark as recently played
+    return { audio, mime: TTS_MIME_BY_EXT[path.extname(hit).slice(1)] || 'audio/mpeg' };
+  } catch {
+    return null;
+  }
+}
+function writeTtsCache(name, audio, mime) {
+  try {
+    const dir = ttsCacheDir();
+    fs.mkdirSync(dir, { recursive: true });
+    const ext = TTS_EXT_BY_MIME[String(mime).split(';')[0].trim().toLowerCase()] || 'mp3';
+    const tmp = path.join(dir, `${name}.${ext}.tmp`);
+    fs.writeFileSync(tmp, audio);
+    fs.renameSync(tmp, path.join(dir, `${name}.${ext}`));
+    const files = fs.readdirSync(dir).filter(f => !f.endsWith('.tmp'));
+    if (files.length > TTS_CACHE_MAX_FILES) {
+      files.map(f => ({ f, t: fs.statSync(path.join(dir, f)).mtimeMs }))
+        .sort((a, b) => a.t - b.t)
+        .slice(0, files.length - TTS_CACHE_MAX_FILES)
+        .forEach(({ f }) => { try { fs.unlinkSync(path.join(dir, f)); } catch {} });
+    }
+  } catch (err) {
+    console.warn('[tts] cache write failed:', err.message);   // playback still works
+  }
+}
+
 // Fire-and-forget wake-up for servers that scale to zero: the renderer calls
 // this when the pointer reaches a speak button, so a cold start is already
 // under way by the time the click lands.
@@ -280,6 +327,10 @@ ipcMain.handle('tts:speak', async (_e, text) => {
   if (typeof text !== 'string' || !text.trim()) return { ok: false, error: 'nothing to speak' };
   const c = loadTtsConfig();
   if (!c) return { ok: false, error: 'text-to-speech is not set up (no tts.json)' };
+  const input = text.slice(0, 2000);
+  const cacheName = ttsCacheName(c, input);
+  const cached = readTtsCache(cacheName);
+  if (cached) return { ok: true, cached: true, ...cached };
   const headers = { 'Content-Type': 'application/json' };
   if (c.key) headers['X-API-Key'] = c.key;
   // Generous: a scaled-to-zero server can take most of a minute to wake.
@@ -289,12 +340,14 @@ ipcMain.handle('tts:speak', async (_e, text) => {
     const res = await net.fetch(c.url, {
       method: 'POST',
       headers,
-      body: JSON.stringify({ model: c.model, input: text.slice(0, 2000), voice: c.voice, speed: c.speed }),
+      body: JSON.stringify({ model: c.model, input, voice: c.voice, speed: c.speed }),
       signal: ctrl.signal,
     });
     if (!res.ok) return { ok: false, error: `speech server answered ${res.status}` };
     const audio = new Uint8Array(await res.arrayBuffer());
-    return { ok: true, audio, mime: res.headers.get('content-type') || 'audio/mpeg' };
+    const mime = res.headers.get('content-type') || 'audio/mpeg';
+    if (audio.length) writeTtsCache(cacheName, audio, mime);
+    return { ok: true, audio, mime };
   } catch (err) {
     return { ok: false, error: err.name === 'AbortError' ? 'speech server timed out' : err.message };
   } finally {

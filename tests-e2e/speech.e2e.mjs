@@ -116,3 +116,22 @@ test('with text highlighted in the note, speak reads only the highlight', async 
   await app.pollUntil(async () => (await app.evaljs(`${speakBtn(JP)}.dataset.speech`)) === 'idle' ? true : null,
     { timeout: 5000, interval: 50, label: 'highlight speech to finish' });
 });
+
+test('spoken audio is saved to disk and replays with no API call after a reload', async () => {
+  const fs = await import('node:fs');
+  const path = await import('node:path');
+  const dir = path.join(app.userData, 'tts-cache');
+  const files = fs.readdirSync(dir);
+  assert.ok(files.some(f => f.endsWith('.wav')), 'the clip is cached under userData/tts-cache');
+  // A reload throws away the page's in-memory cache; only the disk is left.
+  await app.cmd('Page.reload');
+  await app.pollUntil(() => app.evaljs(`!!${speakBtn(JP)}`), { timeout: 20000, interval: 100, label: 'speak button after reload' });
+  const before = requests.filter(r => r.url === '/v1/audio/speech').length;
+  const at = await app.evaljs(`(() => { const b = ${speakBtn(JP)}.getBoundingClientRect(); return { x: Math.round(b.left + b.width / 2), y: Math.round(b.top + b.height / 2) }; })()`);
+  await app.click(at.x, at.y);
+  await app.pollUntil(async () => (await app.evaljs(`${speakBtn(JP)}.dataset.speech`)) === 'playing' ? true : null,
+    { timeout: 5000, interval: 20, label: 'cached clip to start playing' });
+  await app.pollUntil(async () => (await app.evaljs(`${speakBtn(JP)}.dataset.speech`)) === 'idle' ? true : null,
+    { timeout: 5000, interval: 50, label: 'cached clip to finish' });
+  assert.equal(requests.filter(r => r.url === '/v1/audio/speech').length, before, 'no new request to the server');
+});

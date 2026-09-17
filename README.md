@@ -174,7 +174,7 @@ Create `tts.json` next to `notes.json` (see the table above) and restart the app
 }
 ```
 
-The server receives `POST {model, input, voice, speed}` with an `X-API-Key` header and returns audio (MP3, WAV, …) — the OpenAI-style speech contract that AivisSpeech/VOICEVOX shims speak. The request runs in the app's main process, so the key never reaches the page. Before the first click, the app sends `GET /health` so a server that scales to zero can start waking up. No `tts.json`, no button.
+The server receives `POST {model, input, voice, speed}` with an `X-API-Key` header and returns audio (MP3, WAV, …) — the OpenAI-style speech contract that AivisSpeech/VOICEVOX shims speak. The request runs in the app's main process, so the key never reaches the page. Before the first click, the app sends `GET /health` so a server that scales to zero can start waking up. Every clip is saved in `tts-cache/` next to `notes.json`, so anything already spoken replays instantly with no API call, even after a restart (the oldest clips are pruned past 2,000). Delete that folder to clear it. No `tts.json`, no button.
 
 ---
 
