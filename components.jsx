@@ -1834,7 +1834,16 @@ function StickyNote({note, T, tweaks, folder, refCb, selected, selectedIds, setS
     // the folder under the pointer at release via folderIdUnder.
     <div ref={el} data-note="1" data-note-id={note.id}
       onMouseDown={onFocus}
-      onContextMenu={e=>{e.preventDefault(); e.stopPropagation(); setMenu({x:e.clientX, y:e.clientY});}}
+      onContextMenu={e=>{
+        e.preventDefault(); e.stopPropagation();
+        // Right-clicking highlighted text inside this note must offer to copy
+        // just that text — otherwise the only Copy on the menu is the whole-
+        // note clipboard payload (title + body + <!-- sticky-notes/v1 --> JSON).
+        const ws = typeof window.getSelection === 'function' ? window.getSelection() : null;
+        const selText = hasTextSelection(ws) && el.current && el.current.contains(ws.anchorNode)
+          ? ws.toString() : '';
+        setMenu({x:e.clientX, y:e.clientY, selText});
+      }}
       // Dropping picture files anywhere on the note (header, body, footer)
       // inserts them — see onDropFiles. Claiming the dragover is what makes
       // the drop event fire at all, so only do it for drags that carry
@@ -2202,9 +2211,12 @@ function StickyNote({note, T, tweaks, folder, refCb, selected, selectedIds, setS
         const candidates = allNotes.filter(n => n.id !== note.id).slice(0, 20);
         return (
           <ContextMenu T={T} x={menu.x} y={menu.y} fixed onClose={()=>setMenu(null)} items={[
+            menu.selText ? {label:'Copy text', onClick: () => {
+              navigator.clipboard.writeText(menu.selText).catch(err => console.warn('[copy] text', err));
+            }} : null,
             {label: (selected && selectedIds && selectedIds.size > 1)
               ? 'Copy ' + selectedIds.size + ' notes'
-              : 'Copy', onClick: () => onCopy && onCopy()},
+              : 'Copy note', onClick: () => onCopy && onCopy()},
             {label:'Download', onClick:()=>downloadNoteAsMarkdown(note)},
             {divider:true},
             {label:'Edit title', onClick:()=>setEditingTitle(true)},

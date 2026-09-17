@@ -365,3 +365,50 @@ test('the empty note still opens its editor at 0 without a crash', async () => {
   assert.equal(s.start, 0);
   await app.press('Escape');
 });
+
+/* ---------------- copying highlighted text ----------------
+ * The report: highlight a URL in a note, copy it, paste — and get the whole
+ * note back as a clipboard payload (title, body and the
+ * <!-- sticky-notes/v1 --> JSON) instead of the URL. Both ways of copying a
+ * highlight must yield exactly the highlighted text.
+ */
+const selectFirstLine = async () => {
+  await clearSelection();
+  const r = await app.noteBodyRect(NOTE.plain);
+  const y = r.top + 20;
+  const path = [{ x: r.left + 2, y }];
+  for (let x = r.left + 30; x < r.right + 60; x += 25) path.push({ x, y });
+  await app.drag(path);
+  const text = await app.evaljs('getSelection().toString()');
+  assert.match(text, /alpha/, 'a selection should exist in the plain note');
+  return { text, r };
+};
+
+test('Ctrl+C on highlighted note text copies only that text', async () => {
+  await app.evaljs(`navigator.clipboard.writeText('sentinel')`);
+  const { text } = await selectFirstLine();
+  await app.press('c', { ctrl: true });
+  const got = await app.pollUntil(async () => {
+    const t = await app.evaljs('navigator.clipboard.readText()');
+    return t !== 'sentinel' ? t : null;
+  }, { timeout: 3000, interval: 50, label: 'clipboard to change' });
+  assert.equal(got, text);
+  assert.doesNotMatch(got, /sticky-notes\/v1/);
+});
+
+test('right-click on highlighted note text offers "Copy text" that copies only that text', async () => {
+  await app.evaljs(`navigator.clipboard.writeText('sentinel')`);
+  const { text, r } = await selectFirstLine();
+  await rightClick(Math.round(r.left + 30), Math.round(r.top + 20));
+  const row = await app.pollUntil(() => centreOf('.ctx-row > button', 'Copy text'),
+    { timeout: 3000, interval: 50, label: '"Copy text" menu row' });
+  assert.ok(await centreOf('.ctx-row > button', 'Copy note'), 'whole-note copy is still offered');
+  await app.click(row.x, row.y);
+  const got = await app.pollUntil(async () => {
+    const t = await app.evaljs('navigator.clipboard.readText()');
+    return t !== 'sentinel' ? t : null;
+  }, { timeout: 3000, interval: 50, label: 'clipboard to change' });
+  assert.equal(got, text);
+  assert.doesNotMatch(got, /sticky-notes\/v1/);
+  await clearSelection();
+});
