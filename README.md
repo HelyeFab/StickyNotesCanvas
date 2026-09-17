@@ -159,6 +159,25 @@ The JSON format is identical across all three — copy the file from one machine
 
 ---
 
+## Read Japanese notes aloud (optional)
+
+Point the app at a text-to-speech server and every note with Japanese in it gets a speaker button in its header. Click it to hear the note; highlight part of a note first to hear just that part. Right-click also offers **Speak note** and **Speak text**. Only the lines that contain Japanese are read, so a vocab note like `奇跡 / きせき / miracle` skips the English gloss, and URLs, pictures and markdown symbols are never read out.
+
+Create `tts.json` next to `notes.json` (see the table above) and restart the app:
+
+```json
+{
+  "url": "https://your-tts-server/v1/audio/speech",
+  "key": "your-api-key",
+  "voice": "speaker-id",
+  "speed": 1.0
+}
+```
+
+The server receives `POST {model, input, voice, speed}` with an `X-API-Key` header and returns audio (MP3, WAV, …) — the OpenAI-style speech contract that AivisSpeech/VOICEVOX shims speak. The request runs in the app's main process, so the key never reaches the page. Before the first click, the app sends `GET /health` so a server that scales to zero can start waking up. No `tts.json`, no button.
+
+---
+
 ## License
 
 [MIT](LICENSE) — © 2026 faridjaff. Designed with [Claude Design](https://claude.ai/) and engineered with [Claude Code](https://claude.ai/code). Built in a day. Tested over the course of a decade of quietly being annoyed.

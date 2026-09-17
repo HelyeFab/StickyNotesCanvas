@@ -804,6 +804,8 @@ globalStyle.textContent = `
      their own inline outline (the selected note) keep it — inline wins. */
   :focus-visible { outline: 2px solid var(--sticky-accent, #3584e4); outline-offset: 1px; }
   kbd { font-family: ui-monospace, monospace; }
+  /* A note's speak button while the server prepares audio. */
+  @keyframes sticky-speech-pulse { 50% { opacity: .3; } }
   /* While a text selection drags inside one note body, nothing else on the
      page is selectable — the browser then clamps the selection to that note
      natively. Poor man's user-select: contain, which Chromium lacks. (#30) */

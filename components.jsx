@@ -1440,6 +1440,65 @@ function startPointerDrag(e, onMove, onEnd) {
   window.addEventListener('pointercancel', end);
   window.addEventListener('pointerdown', down);
 }
+/* ---------- note speech player ----------
+ * One voice at a time across the whole desk: starting a note stops whatever
+ * another note was saying (or still fetching). Audio is cached per text for
+ * the session, so replaying a note is instant and costs the server nothing.
+ * The owner's setState is told 'loading' → 'playing' → 'idle'.
+ */
+const speechCache = new Map();            // text → object URL, oldest first
+const SPEECH_CACHE_MAX = 30;
+let speechToken = 0;
+let speechAudio = null;
+let speechOwner = null;
+let speechWarmedAt = 0;
+function warmSpeech() {
+  if (!window.stickyAPI?.ttsWarm) return;
+  const now = Date.now();
+  if (now - speechWarmedAt < 5 * 60 * 1000) return;
+  speechWarmedAt = now;
+  window.stickyAPI.ttsWarm().catch(() => {});
+}
+function stopSpeech() {
+  speechToken++;
+  if (speechAudio) { speechAudio.pause(); speechAudio = null; }
+  if (speechOwner) { const owner = speechOwner; speechOwner = null; owner('idle'); }
+}
+// Resolves to null on success, or an error message.
+async function playSpeech(text, setState) {
+  stopSpeech();
+  const token = speechToken;
+  speechOwner = setState;
+  setState('loading');
+  const release = () => { if (speechOwner === setState) { speechOwner = null; setState('idle'); } };
+  let url = speechCache.get(text);
+  if (url) {
+    speechCache.delete(text); speechCache.set(text, url);   // mark most recent
+  } else {
+    let res;
+    try { res = await window.stickyAPI.ttsSpeak(text); }
+    catch (err) { res = { ok: false, error: err.message }; }
+    if (token !== speechToken) return null;                   // stopped meanwhile
+    if (!res?.ok) { release(); return res?.error || 'speech failed'; }
+    url = URL.createObjectURL(new Blob([res.audio], { type: res.mime }));
+    speechCache.set(text, url);
+    if (speechCache.size > SPEECH_CACHE_MAX) {
+      const [oldText, oldUrl] = speechCache.entries().next().value;
+      speechCache.delete(oldText);
+      URL.revokeObjectURL(oldUrl);
+    }
+  }
+  const audio = new Audio(url);
+  speechAudio = audio;
+  const done = () => { if (speechAudio === audio) { speechAudio = null; release(); } };
+  audio.onended = done;
+  audio.onerror = done;
+  setState('playing');
+  try { await audio.play(); }
+  catch (err) { done(); return err.message; }
+  return null;
+}
+
 function StickyNote({note, T, tweaks, folder, refCb, selected, selectedIds, setSelectedIds, setNotes,
   bringGroupToFront,
   onFocus, onChange, onTogglePin, onDelete, onLinkClick, childFolders, onMoveToFolder, onMoveNotesToFolder, zoom=1,
@@ -1449,6 +1508,34 @@ function StickyNote({note, T, tweaks, folder, refCb, selected, selectedIds, setS
   const [editingTitle, setEditingTitle] = useState(false);
   const [menu, setMenu] = useState(null);
   const el = useRef(null);
+  // Note speech: 'idle' | 'loading' | 'playing'. The button only exists when
+  // tts.json is set up and the note has Japanese in it.
+  const [speech, setSpeech] = useState('idle');
+  const [speechError, setSpeechError] = useState('');
+  const canSpeak = !!window.stickyAPI?.ttsConfigured && hasJapanese(note.body);
+  useEffect(() => () => { if (speechOwner === setSpeech) stopSpeech(); }, []);
+  // Reads `text` when given (a right-clicked selection); otherwise the
+  // highlighted text inside this note, else the whole note's Japanese.
+  // The header starts a note drag on press, which drops any highlight, so the
+  // speak button snapshots it at pointerdown (speechSelRef) for the click.
+  const speechSelRef = useRef('');
+  const selectionInNote = () => {
+    const ws = typeof window.getSelection === 'function' ? window.getSelection() : null;
+    return hasTextSelection(ws) && el.current && el.current.contains(ws.anchorNode) ? ws.toString() : '';
+  };
+  const speak = async (text) => {
+    if (speech !== 'idle') { stopSpeech(); return; }
+    let say = text;
+    if (!say) {
+      const sel = speechSelRef.current || selectionInNote();
+      speechSelRef.current = '';
+      say = hasJapanese(sel) ? sel.trim().slice(0, SPEECH_MAX_CHARS) : speechTextFromBody(note.body);
+    }
+    if (!say) return;
+    setSpeechError('');
+    const err = await playSpeech(say, setSpeech);
+    if (err) { console.warn('[speech]', err); setSpeechError(err); }
+  };
 
   // Snapshot the title/body at the moment the user enters edit mode so that
   // pressing Escape reverts to what it was. The input stays controlled (live
@@ -1839,10 +1926,8 @@ function StickyNote({note, T, tweaks, folder, refCb, selected, selectedIds, setS
         // Right-clicking highlighted text inside this note must offer to copy
         // just that text — otherwise the only Copy on the menu is the whole-
         // note clipboard payload (title + body + <!-- sticky-notes/v1 --> JSON).
-        const ws = typeof window.getSelection === 'function' ? window.getSelection() : null;
-        const selText = hasTextSelection(ws) && el.current && el.current.contains(ws.anchorNode)
-          ? ws.toString() : '';
-        setMenu({x:e.clientX, y:e.clientY, selText});
+        if (canSpeak) warmSpeech();
+        setMenu({x:e.clientX, y:e.clientY, selText: selectionInNote()});
       }}
       // Dropping picture files anywhere on the note (header, body, footer)
       // inserts them — see onDropFiles. Claiming the dragover is what makes
@@ -1924,6 +2009,39 @@ function StickyNote({note, T, tweaks, folder, refCb, selected, selectedIds, setS
           <div dir="auto" style={{flex:1, fontWeight:600, fontSize:12*fontScale, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'pre'}}>
             {note.title || <span style={{opacity:.4}}>Untitled</span>}
           </div>
+        )}
+        {canSpeak && (
+          <button
+            data-speech={speech}
+            onPointerEnter={warmSpeech}
+            onPointerDown={e=>{ btnDownRef.current = {x:e.clientX, y:e.clientY}; speechSelRef.current = selectionInNote(); }}
+            onClick={e=>{
+              e.stopPropagation();
+              const d = btnDownRef.current;
+              btnDownRef.current = null;
+              if (d && Math.hypot(e.clientX - d.x, e.clientY - d.y) >= 6) {
+                e.preventDefault();
+                return;
+              }
+              speak();
+            }}
+            title={speech === 'loading' ? 'Fetching speech… · click to cancel'
+              : speech === 'playing' ? 'Speaking · click to stop'
+              : speechError ? `Couldn't speak: ${speechError} · click to retry`
+              : 'Read aloud (or just the highlighted text)'}
+            {...inkHoverProps(ink, speech === 'idle' ? 0.65 : 0.95)}
+            style={{...btnS(ink), opacity: speech === 'idle' ? 0.65 : 0.95,
+              animation: speech === 'loading' ? 'sticky-speech-pulse 1s ease-in-out infinite' : 'none'}}>
+            {speech === 'playing' ? (
+              <svg width="11" height="11" viewBox="0 0 24 24" fill={ink}><rect x="6" y="6" width="12" height="12" rx="2"/></svg>
+            ) : (
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke={speechError ? '#c0392b' : ink} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M11 5L6 9H2v6h4l5 4V5z"/>
+                <path d="M15.5 8.5a5 5 0 010 7"/>
+                <path d="M19 5a10 10 0 010 14"/>
+              </svg>
+            )}
+          </button>
         )}
         {(() => {
           // Badge count reflects all links on this note, including ones whose
@@ -2217,6 +2335,8 @@ function StickyNote({note, T, tweaks, folder, refCb, selected, selectedIds, setS
             {label: (selected && selectedIds && selectedIds.size > 1)
               ? 'Copy ' + selectedIds.size + ' notes'
               : 'Copy note', onClick: () => onCopy && onCopy()},
+            canSpeak && hasJapanese(menu.selText) ? {label:'Speak text', onClick: () => speak(menu.selText.trim().slice(0, SPEECH_MAX_CHARS))} : null,
+            canSpeak ? {label: speech === 'idle' ? 'Speak note' : 'Stop speaking', onClick: () => speech === 'idle' ? speak(speechTextFromBody(note.body)) : stopSpeech()} : null,
             {label:'Download', onClick:()=>downloadNoteAsMarkdown(note)},
             {divider:true},
             {label:'Edit title', onClick:()=>setEditingTitle(true)},

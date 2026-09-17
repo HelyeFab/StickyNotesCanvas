@@ -48,6 +48,13 @@ contextBridge.exposeInMainWorld('stickyAPI', {
 
   // Version of the running Electron build, captured at preload time so the
   // renderer can synchronously compare to the latest GitHub release tag.
+  // Note speech through the server in userData/tts.json (see main.js). The
+  // request runs in main so the API key never reaches the page. Configured is
+  // read once at startup: restart after creating or editing tts.json.
+  ttsConfigured: ipcRenderer.sendSync('tts:configured-sync'),
+  ttsSpeak: (text) => ipcRenderer.invoke('tts:speak', text),
+  ttsWarm: () => ipcRenderer.invoke('tts:warm'),
+
   appVersion: ipcRenderer.sendSync('app:version-sync'),
   // True only on a genuine first install (no notes.json yet). Lets the
   // renderer skip the what's-new note for new users while still showing it

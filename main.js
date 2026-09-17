@@ -235,6 +235,73 @@ function buildMenu() {
   Menu.setApplicationMenu(Menu.buildFromTemplate(template));
 }
 
+/* ---------- note speech (text-to-speech) ----------
+ * Optional. Enabled by a userData/tts.json the user writes by hand:
+ *   { "url": "https://…/v1/audio/speech", "key": "…", "voice": "…", "speed": 1 }
+ * The server speaks the OpenAI-style contract: POST {model,input,voice,speed},
+ * X-API-Key header, audio bytes back. The request runs HERE, not in the page,
+ * so the key never reaches the renderer and no CORS/CSP applies. No file (or a
+ * malformed one) means the feature stays invisible.
+ */
+const ttsConfigPath = () => path.join(userDataDir(), 'tts.json');
+function loadTtsConfig() {
+  try {
+    const c = JSON.parse(fs.readFileSync(ttsConfigPath(), 'utf8'));
+    if (!c || typeof c.url !== 'string' || !/^https?:\/\//i.test(c.url)) return null;
+    return {
+      url: c.url,
+      key: typeof c.key === 'string' ? c.key : '',
+      voice: c.voice != null ? String(c.voice) : '',
+      speed: Number.isFinite(c.speed) ? c.speed : 1,
+      model: typeof c.model === 'string' ? c.model : 'tts-1',
+    };
+  } catch {
+    return null;
+  }
+}
+
+ipcMain.on('tts:configured-sync', (e) => { e.returnValue = !!loadTtsConfig(); });
+
+// Fire-and-forget wake-up for servers that scale to zero: the renderer calls
+// this when the pointer reaches a speak button, so a cold start is already
+// under way by the time the click lands.
+ipcMain.handle('tts:warm', async () => {
+  const c = loadTtsConfig();
+  if (!c) return { ok: false };
+  try {
+    await net.fetch(new URL('/health', c.url).toString());
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: err.message };
+  }
+});
+
+ipcMain.handle('tts:speak', async (_e, text) => {
+  if (typeof text !== 'string' || !text.trim()) return { ok: false, error: 'nothing to speak' };
+  const c = loadTtsConfig();
+  if (!c) return { ok: false, error: 'text-to-speech is not set up (no tts.json)' };
+  const headers = { 'Content-Type': 'application/json' };
+  if (c.key) headers['X-API-Key'] = c.key;
+  // Generous: a scaled-to-zero server can take most of a minute to wake.
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 90000);
+  try {
+    const res = await net.fetch(c.url, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ model: c.model, input: text.slice(0, 2000), voice: c.voice, speed: c.speed }),
+      signal: ctrl.signal,
+    });
+    if (!res.ok) return { ok: false, error: `speech server answered ${res.status}` };
+    const audio = new Uint8Array(await res.arrayBuffer());
+    return { ok: true, audio, mime: res.headers.get('content-type') || 'audio/mpeg' };
+  } catch (err) {
+    return { ok: false, error: err.name === 'AbortError' ? 'speech server timed out' : err.message };
+  } finally {
+    clearTimeout(timer);
+  }
+});
+
 ipcMain.handle('notes:load', async () => {
   return loadNotes(notesPath());
 });

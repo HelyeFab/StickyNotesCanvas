@@ -1118,6 +1118,40 @@ function withA(hex, a) {
 }
 
 
+/* ---------- NOTE SPEECH ----------
+ * What a note's speak button reads. Pure so it is unit-testable. The button
+ * only appears on notes with Japanese in them, and it reads only the lines
+ * that carry Japanese: a vocab note like "奇跡 / きせき / miracle" speaks the
+ * word and its reading, not the English gloss. URLs, pictures and markdown
+ * markers are never read out; fenced blocks (code, mermaid) are skipped.
+ */
+const JAPANESE_CHAR_RE = /[぀-ヿ㐀-䶿一-鿿豈-﫿ｦ-ﾟ]/;
+const SPEECH_MAX_CHARS = 800;
+function hasJapanese(s) {
+  return typeof s === 'string' && JAPANESE_CHAR_RE.test(s);
+}
+function speechTextFromBody(body) {
+  const src = typeof body === 'string' ? body : '';
+  const out = [];
+  let inFence = false;
+  for (const raw of src.split('\n')) {
+    if (/^\s*(```|~~~)/.test(raw)) { inFence = !inFence; continue; }
+    if (inFence) continue;
+    const line = raw
+      .replace(/!\[[^\]]*\]\([^)]*\)/g, '')                          // pictures
+      .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')                        // [label](url) → label
+      .replace(/<?https?:\/\/\S+/g, '')                               // bare URLs
+      .replace(/^\s*(?:>\s?)*(?:#{1,6}\s+|[-*+]\s+(?:\[[ xX]\]\s+)?|\d+[.)]\s+)?/, '') // block markers
+      .replace(/\*\*|__|~~|`/g, '')
+      .trim();
+    if (!hasJapanese(line)) continue;
+    // Each line is its own phrase: give the engine a sentence break unless
+    // the line already ends in one.
+    out.push(/[。．！？!?」』）]$/.test(line) ? line : line + '。');
+  }
+  return out.join('').slice(0, SPEECH_MAX_CHARS);
+}
+
 /* ---------- CANVAS ZOOM ----------
  * One clamp and one anchored-zoom formula shared by every zoom path on the
  * desk: Ctrl+wheel, trackpad/touch pinch, the on-screen +/− buttons and the
@@ -1385,4 +1419,4 @@ function downloadUrlForPlatform(version) {
 }
 const MOBILE_BANNER_DISMISSED_KEY = 'stickies.mobileBannerDismissed';
 const MOBILE_BANNER_MAX_WIDTH = 640;
-Object.assign(window, { CLIPBOARD_IMAGE_BYTES, FOLDER_HUES, HOVER_ALPHA, MOBILE_BANNER_DISMISSED_KEY, MOBILE_BANNER_MAX_WIDTH, NOTE_COLORS, SEED, STICKY_CLIPBOARD_MARKER, TWEAK_DEFAULTS, WHATS_NEW_ID, ZOOM_MAX, ZOOM_MIN, canMoveFolder, canvasPasteAction, clipboardImagesFor, clipboardTextToNotes, cmpSemver, downloadJSON, downloadNoteAsMarkdown, downloadUrlForPlatform, editLinkOnPaste, editListOnEnter, editListOnTab, editQuoteOnPaste, flattenFolderTree, flattenPreviewText, folderPath, folderSubtreeIds, hashRot, hasTextSelection, hexChannels, hoverBg, hoverInk, imageMimeForFile, imageRefsInNotes, isDarkSurface, markdownFileBody, markdownFileTitle, markdownFileToNote, markdownVisibleText, mdToHtml, mixHex, normHex, noteDownloadFilename, notesToClipboardText, noteToMarkdown, openWebLink, pickJSONFile, pickMarkdownFiles, renderedWordAt, sanitizeFolderParents, sourceCaretForPreviewClick, sourceOffsetForWord, themeTokens, uid, whatsNewInfo, withA, withDefaults, zoomActionForKey, zoomViewAt });
+Object.assign(window, { SPEECH_MAX_CHARS, hasJapanese, speechTextFromBody, CLIPBOARD_IMAGE_BYTES, FOLDER_HUES, HOVER_ALPHA, MOBILE_BANNER_DISMISSED_KEY, MOBILE_BANNER_MAX_WIDTH, NOTE_COLORS, SEED, STICKY_CLIPBOARD_MARKER, TWEAK_DEFAULTS, WHATS_NEW_ID, ZOOM_MAX, ZOOM_MIN, canMoveFolder, canvasPasteAction, clipboardImagesFor, clipboardTextToNotes, cmpSemver, downloadJSON, downloadNoteAsMarkdown, downloadUrlForPlatform, editLinkOnPaste, editListOnEnter, editListOnTab, editQuoteOnPaste, flattenFolderTree, flattenPreviewText, folderPath, folderSubtreeIds, hashRot, hasTextSelection, hexChannels, hoverBg, hoverInk, imageMimeForFile, imageRefsInNotes, isDarkSurface, markdownFileBody, markdownFileTitle, markdownFileToNote, markdownVisibleText, mdToHtml, mixHex, normHex, noteDownloadFilename, notesToClipboardText, noteToMarkdown, openWebLink, pickJSONFile, pickMarkdownFiles, renderedWordAt, sanitizeFolderParents, sourceCaretForPreviewClick, sourceOffsetForWord, themeTokens, uid, whatsNewInfo, withA, withDefaults, zoomActionForKey, zoomViewAt });
