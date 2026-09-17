@@ -790,6 +790,20 @@ globalStyle.textContent = `
   .md-body blockquote { margin: 0; padding: 0 0 0 10px; border-left: 3px solid rgba(0,0,0,.25); opacity: .85; }
   .md-body pre { margin: 0; padding: 6px 8px; background: rgba(0,0,0,.06); border-radius: 4px; overflow-x: auto; }
   .md-body pre code { display: block; background: transparent; padding: 0; }
+  /* Syntax colours for fenced code (highlight.js). Every colour keeps at
+     least 4.5:1 contrast on all eight note colours under the code block's
+     shade, so one palette serves every theme. */
+  .md-body .hljs-keyword, .md-body .hljs-selector-tag, .md-body .hljs-built_in, .md-body .hljs-literal { color: #7d0a3f; }
+  .md-body .hljs-keyword, .md-body .hljs-selector-tag { font-weight: 700; }
+  .md-body .hljs-string, .md-body .hljs-regexp, .md-body .hljs-addition, .md-body .hljs-template-string { color: #124a1d; }
+  .md-body .hljs-number, .md-body .hljs-symbol, .md-body .hljs-bullet { color: #6a3200; }
+  .md-body .hljs-comment, .md-body .hljs-quote, .md-body .hljs-deletion { color: #3f444c; font-style: italic; }
+  .md-body .hljs-title, .md-body .hljs-section, .md-body .hljs-function .hljs-title, .md-body .hljs-name { color: #133a7a; }
+  .md-body .hljs-type, .md-body .hljs-class .hljs-title, .md-body .hljs-title.class_, .md-body .hljs-params { color: #4b2677; }
+  .md-body .hljs-meta, .md-body .hljs-variable, .md-body .hljs-template-variable, .md-body .hljs-subst { color: #5c2e00; }
+  .md-body .hljs-attr, .md-body .hljs-attribute, .md-body .hljs-property, .md-body .hljs-selector-class, .md-body .hljs-selector-id { color: #533500; }
+  .md-body .hljs-emphasis { font-style: italic; }
+  .md-body .hljs-strong { font-weight: 700; }
   .md-body table { border-collapse: collapse; margin: 0; font-size: .95em; }
   .md-body th, .md-body td { border: 1px solid rgba(0,0,0,.2); padding: 2px 6px; }
   .md-body img { max-width: 100%; }

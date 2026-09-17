@@ -9,7 +9,7 @@ reason attached, because a rule without a reason gets optimised away.
 
 There is **no build step and no bundler**. `index.html` loads plain `<script>`
 tags; JSX is compiled in the browser by a vendored Babel. Libraries live as
-single files in `vendor/` (React, markdown-it, mermaid) and are loaded the same
+single files in `vendor/` (React, markdown-it, highlight.js, mermaid) and are loaded the same
 way.
 
 So:

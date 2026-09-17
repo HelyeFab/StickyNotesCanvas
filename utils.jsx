@@ -225,6 +225,17 @@ function getMarkdownIt() {
       return `<pre class="mermaid-src" dir="auto"><code>${code}</code></pre>`;
     }
     const cls = lang ? ` class="language-${md.utils.escapeHtml(lang)}"` : '';
+    // Syntax colouring for fences that name a language highlight.js knows
+    // (vendor/highlight.min.js, its "common" set: python, sql, r, js, bash,
+    // json, yaml, …). Unlabelled or unknown fences stay plain — no guessing.
+    // hljs escapes the code itself and only adds <span class="hljs-…">, so
+    // the output stays as inert as the escaped fallback.
+    if (lang && typeof hljs !== 'undefined' && hljs.getLanguage(lang)) {
+      try {
+        const html = hljs.highlight(tok.content, { language: lang, ignoreIllegals: true }).value;
+        return `<pre dir="auto"><code${cls}>${html}</code></pre>`;
+      } catch {}
+    }
     return `<pre dir="auto"><code${cls}>${code}</code></pre>`;
   };
   _md = md;
