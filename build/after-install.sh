@@ -8,7 +8,9 @@ set -e
 # Always SUID, as Chrome's own .deb does: electron-builder's "can I unshare?"
 # probe passes on Ubuntu (unshare has its own AppArmor allowance) while
 # Electron itself is still refused.
-SANDBOX='/opt/Sticky Notes/chrome-sandbox'
+# npm run build:linux installs to /opt/StickyNotes: Electron's SUID sandbox
+# launcher cannot exec a helper whose path contains a space.
+SANDBOX='/opt/StickyNotes/chrome-sandbox'
 if [ -f "$SANDBOX" ]; then
   chown root:root "$SANDBOX" || true
   chmod 4755 "$SANDBOX" || true

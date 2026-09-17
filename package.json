@@ -13,7 +13,7 @@
     "test:e2e": "node --test tests-e2e/*.e2e.mjs",
     "build:icons": "node build-icons.mjs",
     "build": "electron-builder",
-    "build:linux": "electron-builder --linux",
+    "build:linux": "electron-builder --linux -c.productName=StickyNotes",
     "build:mac": "electron-builder --mac"
   },
   "devDependencies": {
@@ -54,6 +54,7 @@
       "synopsis": "Spatial sticky notes canvas",
       "description": "Sticky Notes is a spatial canvas for organizing sticky notes into folders.",
       "desktop": {
+        "Name": "Sticky Notes",
         "StartupWMClass": "sticky-notes"
       }
     },
