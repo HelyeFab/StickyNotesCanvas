@@ -612,6 +612,33 @@ app.whenReady().then(() => {
     return net.fetch(pathToFileURL(file).toString());
   });
 
+  // Pokémon HOME sprites (pokemon.jsx): fetched from PokeAPI's sprite repo the
+  // first time one is shown, then served from userData/pokemon-sprites/ so
+  // they work offline and are never bundled with the app.
+  protocol.handle('sticky-pokemon', async (request) => {
+    let name = '';
+    try { name = new URL(request.url).hostname; } catch {}
+    const m = /^([1-9]\d{0,3})\.png$/.exec(name);
+    if (!m || Number(m[1]) > 1025) return new Response('not found', { status: 404 });
+    const dir = path.join(userDataDir(), 'pokemon-sprites');
+    const file = path.join(dir, name);
+    if (!fs.existsSync(file)) {
+      try {
+        const res = await net.fetch(`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/home/${m[1]}.png`);
+        if (!res.ok) return new Response('not found', { status: 404 });
+        const buf = Buffer.from(await res.arrayBuffer());
+        if (buf.length < 8 || buf.readUInt32BE(0) !== 0x89504e47) return new Response('bad sprite', { status: 502 });
+        fs.mkdirSync(dir, { recursive: true });
+        const tmp = `${file}.${process.pid}.${Date.now()}.tmp`;
+        fs.writeFileSync(tmp, buf);
+        fs.renameSync(tmp, file);
+      } catch (err) {
+        return new Response('offline', { status: 503 });
+      }
+    }
+    return net.fetch(pathToFileURL(file).toString());
+  });
+
   // Deleting a note (or undoing an image paste) leaves its image files
   // behind; sweep them now, before any renderer exists — the only moment
   // an image can't be mid-paste.

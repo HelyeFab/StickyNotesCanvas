@@ -19,7 +19,7 @@ vm.createContext(sandbox);
 vm.runInContext(code, sandbox);
 const { themeTokens, hoverBg, hoverInk, isDarkSurface, mixHex, normHex, withA, HOVER_ALPHA } = sandbox.window;
 
-const THEMES = ['paper', 'flat', 'terminal'];
+const THEMES = ['paper', 'flat', 'terminal', 'pokemon'];
 
 /* ---------------- colour plumbing ---------------- */
 

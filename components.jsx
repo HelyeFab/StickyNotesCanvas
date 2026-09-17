@@ -467,7 +467,7 @@ function TopChrome({T, tweaks, currentFolderName, query, setQuery, onNewNote, on
 
   return (
     <div style={{
-      height:54, background:T.panelBg, borderBottom:`1px solid ${T.panelBorder}`,
+      height:54, background:T.chromeBg || T.panelBg, borderBottom:`1px solid ${T.panelBorder}`,
       display:'flex', alignItems:'center', gap:12, padding:'0 14px', position:'relative', zIndex:20000,
       color:T.panelText,
     }}>
@@ -1470,7 +1470,7 @@ async function playSpeech(text, setState) {
   const token = speechToken;
   speechOwner = setState;
   setState('loading');
-  const release = () => { if (speechOwner === setState) { speechOwner = null; setState('idle'); } };
+  const release = () => { if (speechOwner === setState) { speechOwner = null; setState('idle'); window.pokemonReact?.('speak-end'); } };
   let url = speechCache.get(text);
   if (url) {
     speechCache.delete(text); speechCache.set(text, url);   // mark most recent
@@ -1494,6 +1494,7 @@ async function playSpeech(text, setState) {
   audio.onended = done;
   audio.onerror = done;
   setState('playing');
+  window.pokemonReact?.('speak-start');
   try { await audio.play(); }
   catch (err) { done(); return err.message; }
   return null;
@@ -1511,6 +1512,8 @@ function StickyNote({note, T, tweaks, folder, refCb, selected, selectedIds, setS
   // Note speech: 'idle' | 'loading' | 'playing'. The button only exists when
   // tts.json is set up and the note has Japanese in it.
   const [speech, setSpeech] = useState('idle');
+  // Pokémon sticker in the note's corner (note.pokemon = National Dex number).
+  const [pickingPokemon, setPickingPokemon] = useState(false);
   const [speechError, setSpeechError] = useState('');
   const canSpeak = !!window.stickyAPI?.ttsConfigured && hasJapanese(note.body);
   useEffect(() => () => { if (speechOwner === setSpeech) stopSpeech(); }, []);
@@ -1808,7 +1811,7 @@ function StickyNote({note, T, tweaks, folder, refCb, selected, selectedIds, setS
   useEffect(() => { refCb(el.current); return ()=>refCb(null); }, [refCb]);
 
   const col = NOTE_COLORS.find(c => c.id===note.color) || NOTE_COLORS[0];
-  const bg = tweaks.theme==='paper' ? col.paper : tweaks.theme==='flat' ? col.flat : col.term;
+  const bg = tweaks.theme==='paper' ? col.paper : (tweaks.theme==='flat' || tweaks.theme==='pokemon') ? col.flat : col.term;
   const ink = col.ink;
 
   // Remembers pointer-down coords on any header button (pin, link, ×) so we
@@ -1969,12 +1972,15 @@ function StickyNote({note, T, tweaks, folder, refCb, selected, selectedIds, setS
               e.preventDefault();
               return;
             }
+            if (!note.pinned) window.pokemonReact?.('pin');
             if (onTogglePin) onTogglePin(); else onChange({pinned:!note.pinned});
           }}
           title={note.pinned ? 'Pinned (visible in every folder) · click to unpin' : 'Pin to keep visible in every folder'}
           {...inkHoverProps(ink)}
           style={{...btnS(ink), padding:2}}>
-          {note.pinned ? (
+          {tweaks.theme === 'pokemon' ? (
+            <div style={{opacity: note.pinned ? 1 : 0.55}}><PokeBallIcon size={15} filled={note.pinned} ink={ink}/></div>
+          ) : note.pinned ? (
             <img src="./assets/pin-filled.png" width="16" height="16" alt="Pinned"
                  style={{display:'block'}} draggable={false}/>
           ) : (
@@ -2006,7 +2012,9 @@ function StickyNote({note, T, tweaks, folder, refCb, selected, selectedIds, setS
         ) : (
           /* whiteSpace 'pre' (not 'nowrap') so space runs in the title render
              exactly as typed in the title input (issue #26). */
-          <div dir="auto" style={{flex:1, fontWeight:600, fontSize:12*fontScale, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'pre'}}>
+          <div dir="auto" style={{flex:1, fontWeight:600, fontSize:12*fontScale, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'pre',
+            // The pixel font has no Japanese glyphs; those titles keep the note font.
+            ...(T.titleFont && !hasJapanese(note.title) ? {fontFamily:T.titleFont, fontWeight:400, fontSize:8, lineHeight:1.6} : null)}}>
             {note.title || <span style={{opacity:.4}}>Untitled</span>}
           </div>
         )}
@@ -2317,6 +2325,12 @@ function StickyNote({note, T, tweaks, folder, refCb, selected, selectedIds, setS
           background: `linear-gradient(135deg, transparent 40%, ${withA(ink,0.25)} 40%, ${withA(ink,0.25)} 50%, transparent 50%, transparent 60%, ${withA(ink,0.25)} 60%, ${withA(ink,0.25)} 70%, transparent 70%)`,
         }}/>
 
+      <PokemonSticker id={note.pokemon}/>
+      {pickingPokemon && (
+        <PokemonPicker T={T} title="Add a Pokémon to this note" current={note.pokemon}
+          onPick={(pid)=>{ onSnapshot && onSnapshot(); onChange({pokemon: pid}); }}
+          onClose={()=>setPickingPokemon(false)}/>
+      )}
       {menu && (() => {
         const myLinks = linksFor ? linksFor(note.id) : [];
         const notesById = Object.fromEntries(allNotes.map(x=>[x.id,x]));
@@ -2342,6 +2356,9 @@ function StickyNote({note, T, tweaks, folder, refCb, selected, selectedIds, setS
             {label:'Edit title', onClick:()=>setEditingTitle(true)},
             {label:'Edit body', onClick:()=>setEditing(true)},
             {label:'Insert image…', onClick:()=>insertImageFromPicker()},
+            {label: isPokemonId(note.pokemon) ? 'Change Pokémon…' : 'Add Pokémon…', onClick:()=>setPickingPokemon(true)},
+            {label:'Random Pokémon', onClick:()=>{ onSnapshot && onSnapshot(); onChange({pokemon: randomPokemonId()}); }},
+            isPokemonId(note.pokemon) ? {label:'Remove Pokémon', onClick:()=>{ onSnapshot && onSnapshot(); onChange({pokemon: undefined}); }} : null,
             {label: note.pinned?'Unpin':'Pin to top', onClick:()=>{ if (onTogglePin) onTogglePin(); else onChange({pinned:!note.pinned}); }},
             {divider:true},
             {label:'Link to note ▶', submenu: candidates.map(n => ({
@@ -3084,8 +3101,15 @@ function TweakPanel({T, tweaks, update, onClose, onImportFromImage}) {
         )}
       </div>
       <Label>Visual style</Label>
-      <Segmented T={T} value={tweaks.theme} onChange={v=>update({theme:v})} options={[
-        {id:'paper',label:'Paper'},{id:'flat',label:'Flat'},{id:'terminal',label:'Terminal'}
+      <Segmented T={T} value={tweaks.theme} onChange={v=>update(
+        // The first visit to the Pokémon look brings a partner along.
+        v==='pokemon' && tweaks.showPartner===undefined ? {theme:v, showPartner:true, partner:25} : {theme:v}
+      )} options={[
+        {id:'paper',label:'Paper'},{id:'flat',label:'Flat'},{id:'terminal',label:'Terminal'},{id:'pokemon',label:'Pokémon'}
+      ]}/>
+      <Label>Partner Pokémon</Label>
+      <Segmented T={T} value={tweaks.showPartner ? 'on' : 'off'} onChange={v=>update({showPartner: v==='on'})} options={[
+        {id:'off',label:'Off'},{id:'on',label:'On'}
       ]}/>
       <Label>Font</Label>
       <Segmented T={T} value={tweaks.font} onChange={v=>update({font:v})} options={[

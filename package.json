@@ -31,6 +31,8 @@
       "index.html",
       "app.jsx",
       "components.jsx",
+      "pokemon.jsx",
+      "pokemon-names.js",
       "hooks.jsx",
       "utils.jsx",
       "vendor/**",

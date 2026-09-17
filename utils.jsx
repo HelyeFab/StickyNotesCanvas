@@ -1054,6 +1054,22 @@ function withDefaults(raw) {
 }
 /* ---------- THEME TOKENS ---------- */
 function themeTokens(theme) {
+  if (theme === 'pokemon') {
+    // Pokédex: red band over a black rule on the top chrome, clean panels,
+    // a faint Poké Ball watermark on the desk.
+    const ball = "<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><g fill='none' stroke='%23cfd8e4' stroke-width='2.5' opacity='.32'><circle cx='90' cy='90' r='34'/><path d='M56 90h22M102 90h22'/><circle cx='90' cy='90' r='9'/></g></svg>";
+    return {
+      wallpaper: `url("data:image/svg+xml;utf8,${ball}") 0 0 / 180px 180px repeat, linear-gradient(180deg,#f5f8fc 0%, #e4ebf3 100%)`,
+      panelBg: '#ffffff', panelBorder: '#d5dce6', panelText: '#1d1f24',
+      accent: '#e3350d', muted: '#646c79', hairline: '#eceff4',
+      noteShadow: '0 2px 0 rgba(20,30,50,.07), 0 10px 24px rgba(20,30,50,.14)',
+      noteRadius: '12px',
+      bodyFont: 'Inter, system-ui, sans-serif',
+      folderBg: '#f5f7fb', folderBorder: '#d5dce6',
+      chromeBg: 'linear-gradient(180deg,#e3350d 0,#e3350d 7px,#1d1f24 7px,#1d1f24 9px,#ffffff 9px)',
+      titleFont: '"Press Start 2P", monospace',
+    };
+  }
   if (theme === 'terminal') {
     return {
       wallpaper: 'radial-gradient(1200px 800px at 20% 10%, #1b2028 0%, #0e1116 60%, #0a0c10 100%)',
@@ -1117,6 +1133,52 @@ function withA(hex, a) {
   return `rgba(${r},${g},${b},${a})`;
 }
 
+
+/* ---------- POKÉMON ----------
+ * Pure helpers over window.POKEMON_NAMES (pokemon-names.js, National Dex
+ * order). Sprites: in the desktop app, main.js serves and caches them over
+ * sticky-pokemon://; the browser build points straight at PokeAPI's repo.
+ */
+const POKEMON_COUNT = 1025;
+function isPokemonId(n) {
+  return Number.isInteger(n) && n >= 1 && n <= POKEMON_COUNT;
+}
+function pokemonName(n) {
+  const row = (typeof window !== 'undefined' && window.POKEMON_NAMES || [])[n - 1];
+  return row ? { en: row[0], ja: row[1] } : { en: `#${n}`, ja: '' };
+}
+function pokemonSpriteUrl(n) {
+  if (typeof window !== 'undefined' && window.stickyAPI) return `sticky-pokemon://${n}.png`;
+  return `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/home/${n}.png`;
+}
+function randomPokemonId(rand = Math.random) {
+  return 1 + Math.floor(rand() * POKEMON_COUNT);
+}
+// Hiragana → katakana, so 「ぴかちゅう」 finds ピカチュウ.
+function toKatakana(s) {
+  return s.replace(/[ぁ-ゖ]/g, ch => String.fromCharCode(ch.charCodeAt(0) + 0x60));
+}
+// Number ("25", "#25"), English (prefix matches first, then contains) or
+// Japanese (kana-insensitive). Empty query lists the Dex from #1.
+function searchPokemon(query, limit = 60) {
+  const q = String(query || '').trim();
+  const all = (typeof window !== 'undefined' && window.POKEMON_NAMES) || [];
+  if (!q) return all.slice(0, limit).map((_, i) => i + 1);
+  const num = q.replace(/^#/, '');
+  if (/^\d+$/.test(num)) {
+    const n = parseInt(num, 10);
+    return isPokemonId(n) ? [n] : [];
+  }
+  const lower = q.toLowerCase();
+  const kata = toKatakana(q);
+  const prefix = [], contains = [];
+  all.forEach(([en, ja], i) => {
+    const e = en.toLowerCase();
+    if (e.startsWith(lower) || (ja && ja.startsWith(kata))) prefix.push(i + 1);
+    else if (e.includes(lower) || (ja && ja.includes(kata))) contains.push(i + 1);
+  });
+  return prefix.concat(contains).slice(0, limit);
+}
 
 /* ---------- NOTE SPEECH ----------
  * What a note's speak button reads. Pure so it is unit-testable. The button
@@ -1419,4 +1481,4 @@ function downloadUrlForPlatform(version) {
 }
 const MOBILE_BANNER_DISMISSED_KEY = 'stickies.mobileBannerDismissed';
 const MOBILE_BANNER_MAX_WIDTH = 640;
-Object.assign(window, { SPEECH_MAX_CHARS, hasJapanese, speechTextFromBody, CLIPBOARD_IMAGE_BYTES, FOLDER_HUES, HOVER_ALPHA, MOBILE_BANNER_DISMISSED_KEY, MOBILE_BANNER_MAX_WIDTH, NOTE_COLORS, SEED, STICKY_CLIPBOARD_MARKER, TWEAK_DEFAULTS, WHATS_NEW_ID, ZOOM_MAX, ZOOM_MIN, canMoveFolder, canvasPasteAction, clipboardImagesFor, clipboardTextToNotes, cmpSemver, downloadJSON, downloadNoteAsMarkdown, downloadUrlForPlatform, editLinkOnPaste, editListOnEnter, editListOnTab, editQuoteOnPaste, flattenFolderTree, flattenPreviewText, folderPath, folderSubtreeIds, hashRot, hasTextSelection, hexChannels, hoverBg, hoverInk, imageMimeForFile, imageRefsInNotes, isDarkSurface, markdownFileBody, markdownFileTitle, markdownFileToNote, markdownVisibleText, mdToHtml, mixHex, normHex, noteDownloadFilename, notesToClipboardText, noteToMarkdown, openWebLink, pickJSONFile, pickMarkdownFiles, renderedWordAt, sanitizeFolderParents, sourceCaretForPreviewClick, sourceOffsetForWord, themeTokens, uid, whatsNewInfo, withA, withDefaults, zoomActionForKey, zoomViewAt });
+Object.assign(window, { POKEMON_COUNT, isPokemonId, pokemonName, pokemonSpriteUrl, randomPokemonId, searchPokemon, toKatakana, SPEECH_MAX_CHARS, hasJapanese, speechTextFromBody, CLIPBOARD_IMAGE_BYTES, FOLDER_HUES, HOVER_ALPHA, MOBILE_BANNER_DISMISSED_KEY, MOBILE_BANNER_MAX_WIDTH, NOTE_COLORS, SEED, STICKY_CLIPBOARD_MARKER, TWEAK_DEFAULTS, WHATS_NEW_ID, ZOOM_MAX, ZOOM_MIN, canMoveFolder, canvasPasteAction, clipboardImagesFor, clipboardTextToNotes, cmpSemver, downloadJSON, downloadNoteAsMarkdown, downloadUrlForPlatform, editLinkOnPaste, editListOnEnter, editListOnTab, editQuoteOnPaste, flattenFolderTree, flattenPreviewText, folderPath, folderSubtreeIds, hashRot, hasTextSelection, hexChannels, hoverBg, hoverInk, imageMimeForFile, imageRefsInNotes, isDarkSurface, markdownFileBody, markdownFileTitle, markdownFileToNote, markdownVisibleText, mdToHtml, mixHex, normHex, noteDownloadFilename, notesToClipboardText, noteToMarkdown, openWebLink, pickJSONFile, pickMarkdownFiles, renderedWordAt, sanitizeFolderParents, sourceCaretForPreviewClick, sourceOffsetForWord, themeTokens, uid, whatsNewInfo, withA, withDefaults, zoomActionForKey, zoomViewAt });

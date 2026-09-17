@@ -196,7 +196,7 @@ function AppInner({ store, setKey, exportNow, importNow, takeSnapshot, undo, red
   };
   const focusNote = (id) => { bringToFront(id); setSelectedIds(new Set([id])); };
   const updateNote = (id, patch) => setNotes(ns => ns.map(n => n.id===id ? {...n, ...patch} : n));
-  const deleteNote = (id) => { takeSnapshot(); setNotes(ns => ns.filter(n => n.id!==id)); setConfirmDel(null); };
+  const deleteNote = (id) => { takeSnapshot(); setNotes(ns => ns.filter(n => n.id!==id)); setConfirmDel(null); window.pokemonReact?.('delete'); };
   const updateFolder = (id, patch) => setFolders(fs => ({...fs, [id]: {...fs[id], ...patch}}));
 
   const createNote = (x, y) => {
@@ -214,6 +214,7 @@ function AppInner({ store, setKey, exportNow, importNow, takeSnapshot, undo, red
     takeSnapshot();
     setNotes(ns => [...ns, n]);
     setTimeout(()=>focusNote(id), 0);
+    window.pokemonReact?.('create');
   };
 
   const folderOrder = store.folderOrder;
@@ -750,6 +751,8 @@ function AppInner({ store, setKey, exportNow, importNow, takeSnapshot, undo, red
       )}
 
       {(tweakActive || prefsOpen) && <TweakPanel T={T} tweaks={tweaks} update={updateTweak} onClose={()=>setPrefsOpen(false)} onImportFromImage={onImportFromImage}/>}
+
+      {tweaks.showPartner && <PartnerPokemon T={T} tweaks={tweaks} update={updateTweak}/>}
 
       <StatusBar T={T} tweaks={tweaks}
         folderName={currentFolderName}
