@@ -157,6 +157,10 @@ Launch from Spotlight (`Cmd+Space` → "Sticky Notes") or from Launchpad. To uni
 
 The JSON format is identical across all three — copy the file from one machine to another and your notes come with it.
 
+### List view (this fork)
+
+**Canvas | List** in the top bar. *List* shows the current folder as one folded line per note — colour bar, title (or first line), a grey preview of the rest, and the folder chip when you're in All notes — most recently touched first. Click a row to unfold it to the rendered note; **Open on canvas** (or a double-click) jumps back to the desk with that note selected. The list is read-only: editing stays on the canvas. The choice is remembered.
+
 ### Automatic backup to a folder (this fork)
 
 **Preferences → Automatic backup → Choose folder…** Pick any folder — the point is to pick one a cloud client already syncs (Google Drive via Insync, Dropbox, Nextcloud, …), so your notes reach the cloud without the app talking to any service itself. The app then writes, **at startup and at quit**:

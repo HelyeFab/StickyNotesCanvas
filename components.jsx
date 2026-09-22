@@ -436,7 +436,7 @@ function MobileDemoBanner() {
 /* ==================================================================== */
 /* TOP CHROME                                                            */
 /* ==================================================================== */
-function TopChrome({T, tweaks, currentFolderName, query, setQuery, onNewNote, onNewFolder, onExport, onImport}) {
+function TopChrome({T, tweaks, currentFolderName, query, setQuery, onNewNote, onNewFolder, onExport, onImport, layout, setLayout}) {
   const isTerm = tweaks.theme==='terminal';
   const [backupOpen, setBackupOpen] = useState(false);
 
@@ -481,6 +481,29 @@ function TopChrome({T, tweaks, currentFolderName, query, setQuery, onNewNote, on
       <div dir="auto" style={{fontSize:13, color:T.panelText, opacity:.85, fontWeight:500}}>
         {currentFolderName}
       </div>
+
+      {setLayout && (
+        <div data-layout-toggle role="group" aria-label="View" style={{
+          display:'flex', marginInlineStart:10, padding:2, gap:2,
+          background: withA(hoverInk(T), .07), border:`1px solid ${T.panelBorder}`, borderRadius: isTerm?2:8,
+        }}>
+          {[['canvas', isTerm?'canvas':'Canvas'], ['list', isTerm?'list':'List']].map(([id, label]) => {
+            const active = (layout || 'canvas') === id;
+            return (
+              <button key={id} data-layout={id} aria-pressed={active} onClick={()=>setLayout(id)}
+                title={id==='list' ? 'One folded line per note' : 'Notes spread over the desk'}
+                onMouseEnter={e=>{ if(!active) e.currentTarget.style.background = hoverBg(T); }}
+                onMouseLeave={e=>{ if(!active) e.currentTarget.style.background = 'transparent'; }}
+                style={{
+                  border:'none', padding:'4px 10px', fontSize:12, borderRadius: isTerm?2:6, cursor:'pointer',
+                  font:'inherit', fontSize:12,
+                  background: active ? T.panelBg : 'transparent', color:T.panelText,
+                  boxShadow: active ? '0 1px 3px rgba(0,0,0,.12)' : 'none', opacity: active ? 1 : .7,
+                }}>{label}</button>
+            );
+          })}
+        </div>
+      )}
 
       <div style={{flex:1}}/>
 
@@ -3261,6 +3284,107 @@ function Segmented({T, value, onChange, options}) {
 /* ==================================================================== */
 /* STATUS BAR                                                            */
 /* ==================================================================== */
+/* ==================================================================== */
+/* LIST VIEW — one folded line per note                                 */
+/* ==================================================================== */
+// The alternative to the desk: every note in the current folder as a single
+// row (title or first line, then a grey preview of the rest), most recently
+// touched first. Clicking a row unfolds it to the rendered body; "Open on
+// canvas" switches back to the desk with that note focused. Read-only by
+// design — editing stays on the desk, where the note has its full toolbar.
+function noteListLine(note) {
+  const title = (note.title || '').trim();
+  let body = '';
+  try { body = markdownVisibleText(note.body).text; } catch { body = String(note.body || ''); }
+  const lines = body.split('\n').map(l => l.trim()).filter(Boolean);
+  const first = lines[0] || '';
+  const head = title || first || 'Untitled';
+  // The preview never repeats the headline it sits next to.
+  const rest = (title ? lines : lines.slice(1)).join(' · ');
+  return { head, rest, empty: !title && !first };
+}
+function NotesList({T, tweaks, notes, folders, isAll, drawerOpen, onOpenOnCanvas, currentFolderName}) {
+  const [open, setOpen] = useState(() => new Set());
+  const isTerm = tweaks.theme==='terminal';
+  const rows = useMemo(() => [...notes].sort((a, b) => (b.z||0) - (a.z||0)), [notes]);
+  const toggle = (id) => setOpen(prev => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n; });
+  const showStickers = tweaks.theme === 'pokemon' && typeof window.PokemonSprite === 'function';
+  return (
+    <div data-notes-list style={{
+      position:'absolute', left:0, right: drawerOpen ? 320 : 0, top:54, bottom:28,
+      overflowY:'auto', overflowX:'hidden', color:T.panelText,
+    }}>
+      <div style={{maxWidth:860, margin:'0 auto', padding:'18px 20px 40px'}}>
+        {rows.length === 0 && (
+          <div data-notes-list-empty style={{opacity:.55, fontSize:13, padding:'40px 0', textAlign:'center'}}>
+            {isTerm ? 'no notes here' : 'No notes here yet.'}
+          </div>
+        )}
+        {rows.map(n => {
+          const col = NOTE_COLORS.find(c=>c.id===n.color) || NOTE_COLORS[4];
+          const bg = tweaks.theme==='paper' ? col.paper : (tweaks.theme==='flat' || tweaks.theme==='pokemon') ? col.flat : col.term;
+          const { head, rest, empty } = noteListLine(n);
+          const expanded = open.has(n.id);
+          const pokemonId = notePokemon(n, pokemonOnEveryNote(tweaks));
+          return (
+            <div key={n.id} data-list-note={n.id} data-expanded={expanded ? '1' : '0'} style={{
+              marginBottom:6, borderRadius: isTerm ? 2 : 10, overflow:'hidden',
+              background: T.panelBg, border:`1px solid ${T.panelBorder}`,
+              boxShadow: expanded ? '0 6px 20px rgba(0,0,0,.10)' : 'none',
+            }}>
+              <div role="button" tabIndex={0} data-list-row onClick={()=>toggle(n.id)}
+                onDoubleClick={(e)=>{ e.preventDefault(); onOpenOnCanvas && onOpenOnCanvas(n.id); }}
+                onKeyDown={(e)=>{ if (e.key==='Enter' || e.key===' ') { e.preventDefault(); toggle(n.id); } }}
+                {...hoverProps(T, T.panelBg)}
+                style={{
+                  display:'flex', alignItems:'center', gap:10, padding:'8px 12px 8px 0', cursor:'pointer',
+                  userSelect:'none', minHeight:38, background:T.panelBg,
+                }}>
+                <span aria-hidden style={{alignSelf:'stretch', width:6, background:bg, flex:'0 0 auto'}}/>
+                <span aria-hidden style={{
+                  width:8, fontSize:10, opacity:.5, textAlign:'center', flex:'0 0 auto',
+                  transform: expanded ? 'rotate(90deg)' : 'none', transition:'transform .12s',
+                }}>▶</span>
+                {showStickers && pokemonId ? <window.PokemonSprite id={pokemonId} size={26} style={{flex:'0 0 auto'}}/> : null}
+                {n.pinned && <span title="Pinned" style={{fontSize:11, opacity:.6, flex:'0 0 auto'}}>📌</span>}
+                <span dir="auto" data-list-head style={{
+                  fontWeight: 600, fontSize:13, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis',
+                  flex:'0 1 auto', maxWidth:'55%', opacity: empty ? .5 : 1, fontStyle: empty ? 'italic' : 'normal',
+                }}>{head}</span>
+                {rest && !expanded && <span dir="auto" data-list-rest style={{
+                  fontSize:12, opacity:.55, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis', flex:'1 1 auto',
+                }}>{rest}</span>}
+                <span style={{flex:'1 1 auto'}}/>
+                {isAll && folders[n.folder] && (
+                  <span data-list-folder style={{
+                    fontSize:11, opacity:.6, flex:'0 0 auto', display:'flex', alignItems:'center', gap:5,
+                  }}>
+                    <span style={{width:8, height:8, borderRadius:2, background:folders[n.folder].hue}}/>
+                    {folders[n.folder].name}
+                  </span>
+                )}
+              </div>
+              {expanded && (
+                <div data-list-body style={{borderTop:`1px solid ${T.hairline}`, background: withA(bg, isTerm ? .25 : .45), color: isTerm ? T.panelText : col.ink}}>
+                  <div style={{padding:'10px 14px 6px', fontSize: 13, lineHeight: 1.5}}>
+                    <div className="md-body" dir="auto" dangerouslySetInnerHTML={{__html: mdToHtml(n.body)}}
+                      onClick={(e)=>{ const a = e.target.closest && e.target.closest('a[data-weblink]'); if (a) { e.preventDefault(); openWebLink(a.getAttribute('href')); } }}/>
+                  </div>
+                  <div style={{display:'flex', justifyContent:'flex-end', padding:'4px 10px 8px'}}>
+                    <button data-list-open onClick={()=>onOpenOnCanvas && onOpenOnCanvas(n.id)} {...hoverProps(T)} style={{
+                      border:`1px solid ${T.panelBorder}`, background:'transparent', color:T.panelText,
+                      borderRadius: isTerm ? 2 : 6, padding:'4px 10px', fontSize:12, cursor:'pointer', font:'inherit',
+                    }}>{isTerm ? 'open on canvas' : 'Open on canvas'}</button>
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
 function StatusBar({T, tweaks, folderName, noteCount, folderCount, onOpenPrefs}) {
   return (
     <div style={{
@@ -3311,4 +3435,4 @@ function StatusBar({T, tweaks, folderName, noteCount, folderCount, onOpenPrefs})
   );
 }
 
-Object.assign(window, { AppGlyph, ColorDots, ConfirmDialog, ContextMenu, Desktop, EmptyState, FolderIcon, FolderTree, FoldersDrawer, HomeIcon, IMPORT_FROM_IMAGE_PROMPT, ImportFromImageDialog, InfoDialog, KeyHint, Label, Loading, MOBILE_BANNER_DISMISSED_KEY, MOBILE_BANNER_MAX_WIDTH, MobileDemoBanner, PanelAction, PasteErrorToast, Segmented, StatusBar, StickyNote, TopChrome, TweakPanel, UpdateBanner, btnS, kbdS, zBtn });
+Object.assign(window, { AppGlyph, ColorDots, ConfirmDialog, ContextMenu, Desktop, EmptyState, FolderIcon, FolderTree, FoldersDrawer, HomeIcon, IMPORT_FROM_IMAGE_PROMPT, ImportFromImageDialog, InfoDialog, KeyHint, Label, Loading, MOBILE_BANNER_DISMISSED_KEY, MOBILE_BANNER_MAX_WIDTH, MobileDemoBanner, NotesList, PanelAction, PasteErrorToast, Segmented, StatusBar, StickyNote, TopChrome, TweakPanel, UpdateBanner, btnS, kbdS, noteListLine, zBtn });

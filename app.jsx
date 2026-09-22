@@ -685,6 +685,8 @@ function AppInner({ store, setKey, exportNow, importNow, takeSnapshot, undo, red
         onNewFolder={createFolder}
         onExport={exportNow}
         onImport={importNow}
+        layout={store.layout}
+        setLayout={(v) => setKey('layout', v)}
       />
 
       <FoldersDrawer T={T} tweaks={tweaks}
@@ -704,6 +706,16 @@ function AppInner({ store, setKey, exportNow, importNow, takeSnapshot, undo, red
         setFolderOrder={setFolderOrder}
       />
 
+      {store.layout === 'list' ? (
+        <NotesList T={T} tweaks={tweaks}
+          notes={filteredNotes}
+          folders={folders}
+          isAll={isAll}
+          drawerOpen={store.drawer}
+          currentFolderName={currentFolderName}
+          onOpenOnCanvas={(id) => { setKey('layout', 'canvas'); setTimeout(() => jumpToNote(id), 60); }}
+        />
+      ) : (
       <Desktop T={T} tweaks={tweaks}
         currentFolder={currentFolder}
         folders={folders}
@@ -728,6 +740,7 @@ function AppInner({ store, setKey, exportNow, importNow, takeSnapshot, undo, red
         drawerOpen={store.drawer}
         takeSnapshot={takeSnapshot}
       />
+      )}
 
       {confirmDel && (
         <ConfirmDialog T={T}

@@ -317,8 +317,11 @@ test('an OLD backup (no images key) restores exactly as it does today', () => {
       { written: [], skipped: [], rejected: [] });
     assert.ok(!fs.existsSync(path.join(d, 'images')));
     // And it hydrates into the same store the app has always produced.
+    // (`layout` is UI state this build added after the fixture was frozen;
+    // an old build simply never knew it.)
+    const sansNew = (s) => { const { layout, ...rest } = s; return rest; };
     assert.deepEqual(plain(now.withDefaults(parsed)), plain(now.withDefaults(store)));
-    assert.deepEqual(plain(old.withDefaults(parsed)), plain(now.withDefaults(store)));
+    assert.deepEqual(plain(old.withDefaults(parsed)), sansNew(plain(now.withDefaults(store))));
   } finally {
     fs.rmSync(d, { recursive: true, force: true });
   }

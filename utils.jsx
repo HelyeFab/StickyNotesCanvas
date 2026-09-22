@@ -1061,6 +1061,8 @@ function withDefaults(raw) {
     view:    src.view    ?? { x: 0, y: 0, z: 1 },
     drawer:  typeof src.drawer === 'boolean' ? src.drawer : defaultDrawer,
     folderOrder: Array.isArray(src.folderOrder) ? src.folderOrder : [],
+    // 'canvas' (the spatial desk) or 'list' (one folded row per note).
+    layout:  src.layout === 'list' ? 'list' : 'canvas',
   };
 }
 /* ---------- THEME TOKENS ---------- */
