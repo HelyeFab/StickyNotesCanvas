@@ -2641,12 +2641,9 @@ function FoldersDrawer({T, tweaks, folders, notes, currentFolder, setCurrentFold
 
   const renderRow = (f, isAll, depth = 0, hasChildren = false) => {
     const isActive = currentFolder===f.id;
-    // A folder's count covers its whole subtree, matching what the canvas
-    // shows when the folder is open (and what a collapsed parent contains).
-    const count = isAll ? notes.length : (() => {
-      const ids = folderSubtreeIds(folders, f.id);
-      return notes.filter(n => ids.has(n.folder)).length;
-    })();
+    // A folder's count is its OWN notes, matching what the canvas shows when
+    // the folder is open (subfolder notes are no longer rolled up).
+    const count = isAll ? notes.length : notes.filter(n => n.folder === f.id).length;
     const swatch = isAll ? T.accent : f.hue;
     const idleBg = isTerm ? '#0e1319' : 'rgba(0,0,0,.02)';
     // Theme-derived (issue #49): the old pair moved the row by 13/255 on

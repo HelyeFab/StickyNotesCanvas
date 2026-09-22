@@ -80,3 +80,26 @@ test('right-click → "Move 2 notes to folder ▶" moves the whole selection', a
     assert.equal(await app.evaljs(`!!document.querySelector('.ctx-row')`), false, 'the menu closes after the move');
   } finally { await app.close(); }
 });
+
+test('a folder view shows only its own notes; subfolder notes stay in the subfolder', async () => {
+  // n1 lives in c (a subfolder of b); n2 lives in b itself. Opening b must
+  // show n2 only, and the sidebar count for b must be 1 — no roll-up, so a
+  // note moved into a subfolder can never look like a duplicate in its parent.
+  // (The harness waits for every seeded note to render, so start in All
+  // notes and open b from the sidebar.)
+  const app = await launch({ seed: seed([note('n1', 'c', 40, 40), note('n2', 'b', 340, 40)]) });
+  try {
+    const b = await helpers(app).centre('[data-folder-id="b"]');
+    await app.click(b.x, b.y);
+    await app.pollUntil(() => app.evaljs(`!document.querySelector('[data-note-id="n1"]') && !!document.querySelector('[data-note-id="n2"]')`), { timeout: 3000, interval: 50, label: 'only n2 rendered in b' });
+    const countB = await app.evaljs(`document.querySelector('[data-folder-id="b"]').textContent`);
+    assert.match(countB, /\D1 note\b/, 'sidebar count for b is its own notes only');
+    const countC = await app.evaljs(`document.querySelector('[data-folder-id="c"]').textContent`);
+    assert.match(countC, /\D1 note\b/);
+    // Opening the subfolder shows its note.
+    const c = await helpers(app).centre('[data-folder-id="c"]');
+    await app.click(c.x, c.y);
+    await app.pollUntil(() => app.evaljs(`!!document.querySelector('[data-note-id="n1"]')`), { timeout: 3000, interval: 50, label: 'n1 rendered in c' });
+    assert.equal(await app.evaljs(`!!document.querySelector('[data-note-id="n2"]')`), false);
+  } finally { await app.close(); }
+});

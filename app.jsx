@@ -145,15 +145,15 @@ function AppInner({ store, setKey, exportNow, importNow, takeSnapshot, undo, red
   /* ----- derived ----- */
   const isAll = currentFolder==='root';
 
-  // Notes visible on the canvas. A folder view rolls up its whole subtree —
-  // the folder's own notes plus everything in nested subfolders — and also
-  // surfaces any pinned note from elsewhere ("follow me across folders").
-  const visibleFolderIds = useMemo(() =>
-    isAll ? null : folderSubtreeIds(folders, currentFolder),
-    [folders, currentFolder, isAll]);
+  // Notes visible on the canvas. A folder view shows ONLY the folder's own
+  // notes (plus any pinned note from elsewhere — "follow me across folders").
+  // It used to roll up the whole subtree, which made a note moved into a
+  // subfolder look like a duplicate that was still sitting in the parent;
+  // deleting that "duplicate" deleted the one real note. A note now lives in
+  // exactly one view, so "move" means it leaves the folder it came from.
   const folderNotes = useMemo(() =>
-    isAll ? notes : notes.filter(n => visibleFolderIds.has(n.folder) || n.pinned),
-    [notes, visibleFolderIds, isAll]);
+    isAll ? notes : notes.filter(n => n.folder === currentFolder || n.pinned),
+    [notes, currentFolder, isAll]);
 
   const filteredNotes = useMemo(() => {
     if (!query.trim()) return folderNotes;
@@ -553,10 +553,8 @@ function AppInner({ store, setKey, exportNow, importNow, takeSnapshot, undo, red
 
   const jumpToNote = (id) => {
     const n = notes.find(x => x.id===id); if (!n) return;
-    // Only switch folders when the target is genuinely out of view — a note
-    // in a nested subfolder is already visible in an ancestor's rolled-up
-    // canvas, so jumping to it shouldn't yank the user into the subfolder.
-    if (!isAll && !visibleFolderIds.has(n.folder) && !n.pinned) setCurrentFolder(n.folder);
+    // Only switch folders when the target is genuinely out of view.
+    if (!isAll && n.folder !== currentFolder && !n.pinned) setCurrentFolder(n.folder);
     setTimeout(()=>focusNote(id), 50);
   };
 
