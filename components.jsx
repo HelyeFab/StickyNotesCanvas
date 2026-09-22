@@ -1260,6 +1260,7 @@ function Desktop({T, tweaks, currentFolder, folders, folderOrder, notes, allNote
             onDelete={()=>onDeleteNote(n.id)}
             onLinkClick={jumpToNote}
             childFolders={folderTreeRows.filter(r=>r.id!==n.folder).map(r=>({...folders[r.id], depth:r.depth}))}
+            allFolders={folderTreeRows.map(r=>({...folders[r.id], depth:r.depth}))}
             onMoveToFolder={(fid)=>moveNoteToFolder(n.id, fid)}
             zoom={view.z}
             allNotes={allNotes}
@@ -1502,7 +1503,7 @@ async function playSpeech(text, setState) {
 
 function StickyNote({note, T, tweaks, folder, refCb, selected, selectedIds, setSelectedIds, setNotes,
   bringGroupToFront,
-  onFocus, onChange, onTogglePin, onDelete, onLinkClick, childFolders, onMoveToFolder, onMoveNotesToFolder, zoom=1,
+  onFocus, onChange, onTogglePin, onDelete, onLinkClick, childFolders, allFolders, onMoveToFolder, onMoveNotesToFolder, zoom=1,
   allNotes=[], linksFor, onAddLink, onStartLink, onJumpToNote, onCopy, onSnapshot}) {
   const zRef = useRef(zoom); zRef.current = zoom;
   const [editing, setEditing] = useState(false);
@@ -2370,7 +2371,20 @@ function StickyNote({note, T, tweaks, folder, refCb, selected, selectedIds, setS
             myLinks.length ? {label:`Linked notes (${myLinks.length}) ▶`, submenu: linkSubmenu} : null,
             {divider:true},
             {label:'Change color ▶', submenu: NOTE_COLORS.map(c=>({label:c.name, dot:c.paper, onClick:()=>onChange({color:c.id})}))},
-            childFolders.length ? {label:'Move to folder ▶', submenu: childFolders.map(f=>({label:'  '.repeat(Math.min(f.depth||0, 5)) + f.name, dot:f.hue, onClick:()=>onMoveToFolder(f.id)}))} : null,
+            // With a multi-selection that includes this note, "Move to folder"
+            // moves the WHOLE selection (mirrors "Copy N notes" above and the
+            // group drag-to-folder). Folders every selected note already lives
+            // in are left out, so the submenu never offers a no-op.
+            (() => {
+              const group = selected && selectedIds && selectedIds.size > 1 && onMoveNotesToFolder && allFolders;
+              if (!group) {
+                return childFolders.length ? {label:'Move to folder ▶', submenu: childFolders.map(f=>({label:'  '.repeat(Math.min(f.depth||0, 5)) + f.name, dot:f.hue, onClick:()=>onMoveToFolder(f.id)}))} : null;
+              }
+              const ids = [...selectedIds];
+              const homes = new Set(allNotes.filter(n => selectedIds.has(n.id)).map(n => n.folder));
+              const rows = allFolders.filter(f => !(homes.size === 1 && homes.has(f.id)));
+              return rows.length ? {label:`Move ${ids.length} notes to folder ▶`, submenu: rows.map(f=>({label:'  '.repeat(Math.min(f.depth||0, 5)) + f.name, dot:f.hue, onClick:()=>onMoveNotesToFolder(ids, f.id)}))} : null;
+            })(),
             {divider:true},
             {label:'Delete…', destructive:true, onClick:onDelete},
           ].filter(Boolean)}/>
