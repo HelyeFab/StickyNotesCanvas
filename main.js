@@ -8,6 +8,7 @@ const {
   referencedImageNames, readImages, collectImages, writeImages,
   CLIPBOARD_IMAGE_BUDGET,
 } = require('./storage.js');
+const { loadSyncConfig, saveSyncConfig, writeBackup } = require('./sync.js');
 
 // E2E test hook: when STICKY_USER_DATA is set, store all app data (notes.json,
 // window.json, the Chromium profile) under that directory instead of the real
@@ -234,6 +235,76 @@ function buildMenu() {
   ];
   Menu.setApplicationMenu(Menu.buildFromTemplate(template));
 }
+
+/* ---------- automatic backup to a folder (sync.js) ----------
+ * The user picks a folder in Preferences — typically one a cloud client
+ * already syncs (Google Drive via Insync, Dropbox, Nextcloud…), which is how
+ * the notes reach the cloud without the app talking to any service. Main
+ * writes a "Save backup…"-shaped bundle there at startup and at quit, plus a
+ * dated copy under history/ whenever the state changed. Settings live in
+ * userData/sync.json, per machine (a path means nothing elsewhere).
+ */
+const syncConfigPath = () => path.join(userDataDir(), 'sync.json');
+
+function currentStoreForBackup() {
+  // Whatever the renderer last handed us wins over the file: at quit a save
+  // may still be in flight.
+  if (pendingSave && pendingSave.data) return pendingSave.data;
+  const data = loadNotes(notesPath());
+  return data && Array.isArray(data.notes) ? data : null;
+}
+
+// reason: 'start' | 'quit' | 'manual' | 'chosen' — recorded for the status
+// line in Preferences. Synchronous on purpose: at quit there is no later.
+function runAutoBackup(reason) {
+  const cfg = loadSyncConfig(syncConfigPath());
+  if (!cfg.dir) return { ok: false, error: 'no backup folder chosen', unset: true };
+  const store = currentStoreForBackup();
+  if (!store) return { ok: false, error: 'nothing to back up yet' };
+  let images = {};
+  try { images = collectImages(imagesDir(), store); } catch (err) {
+    console.warn('[backup] bundling images failed:', err.message);
+  }
+  const r = writeBackup({ dir: cfg.dir, store, images, keep: cfg.keep });
+  const last = { at: new Date().toISOString(), reason, ok: r.ok, error: r.ok ? null : r.error, changed: !!r.changed };
+  try { saveSyncConfig(syncConfigPath(), { ...cfg, last }); } catch (err) {
+    console.warn('[backup] could not record status:', err.message);
+  }
+  if (r.ok) console.log(`[backup] ${reason}: wrote ${r.path}${r.changed ? ' (+history)' : ''}`);
+  else console.warn(`[backup] ${reason} failed: ${r.error}`);
+  return { ...r, last };
+}
+
+const syncStatus = () => {
+  const cfg = loadSyncConfig(syncConfigPath());
+  return { dir: cfg.dir || null, last: cfg.last || null };
+};
+
+ipcMain.handle('sync:status', async () => syncStatus());
+
+ipcMain.handle('sync:choose-dir', async () => {
+  const { canceled, filePaths } = await dialog.showOpenDialog(mainWindow, {
+    title: 'Choose the backup folder',
+    buttonLabel: 'Use this folder',
+    properties: ['openDirectory', 'createDirectory'],
+  });
+  if (canceled || !filePaths || !filePaths[0]) return { ok: false, canceled: true, ...syncStatus() };
+  const cfg = loadSyncConfig(syncConfigPath());
+  saveSyncConfig(syncConfigPath(), { ...cfg, dir: filePaths[0], last: null });
+  const r = runAutoBackup('chosen');
+  return { ok: r.ok, error: r.ok ? null : r.error, ...syncStatus() };
+});
+
+ipcMain.handle('sync:clear', async () => {
+  const cfg = loadSyncConfig(syncConfigPath());
+  saveSyncConfig(syncConfigPath(), { ...cfg, dir: null, last: null });
+  return { ok: true, ...syncStatus() };
+});
+
+ipcMain.handle('sync:now', async () => {
+  const r = runAutoBackup('manual');
+  return { ok: r.ok, error: r.ok ? null : r.error, ...syncStatus() };
+});
 
 /* ---------- note speech (text-to-speech) ----------
  * Optional. Enabled by a userData/tts.json the user writes by hand:
@@ -659,6 +730,10 @@ app.whenReady().then(() => {
   buildMenu();
   createWindow();
 
+  // Startup backup: off the critical path so the window is up first, and
+  // only when a folder was chosen (runAutoBackup is a no-op otherwise).
+  setTimeout(() => { try { runAutoBackup('start'); } catch (err) { console.warn('[backup] start failed:', err.message); } }, 1500);
+
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });
@@ -678,4 +753,6 @@ app.on('before-quit', () => {
       console.warn('[main] final save failed:', err.message);
     }
   }
+  // Quit backup, after the final save so the bundle matches the file.
+  try { runAutoBackup('quit'); } catch (err) { console.warn('[backup] quit failed:', err.message); }
 });

@@ -28,6 +28,7 @@
       "main.js",
       "preload.js",
       "storage.js",
+      "sync.js",
       "index.html",
       "app.jsx",
       "components.jsx",

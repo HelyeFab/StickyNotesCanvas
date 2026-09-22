@@ -3159,6 +3159,7 @@ function TweakPanel({T, tweaks, update, onClose, onImportFromImage}) {
           </div>
         </Fragment>
       )}
+      {!!window.stickyAPI?.autoBackup && <AutoBackupSection T={T}/>}
       {onImportFromImage && (
         <Fragment>
           <Label>More</Label>
@@ -3166,6 +3167,55 @@ function TweakPanel({T, tweaks, update, onClose, onImportFromImage}) {
         </Fragment>
       )}
     </div>
+  );
+}
+// Preferences → Automatic backup. The app writes a backup bundle into a
+// folder of the user's choosing at startup and at quit (main.js + sync.js);
+// pointing it at a folder a cloud client syncs (Google Drive via Insync,
+// Dropbox, Nextcloud…) is what puts the notes in the cloud. The panel shows
+// where, when it last ran, and whether that worked.
+function AutoBackupSection({T}) {
+  const api = window.stickyAPI.autoBackup;
+  const [st, setSt] = useState({ dir: null, last: null });
+  const [busy, setBusy] = useState(false);
+  useEffect(() => { api.status().then(setSt).catch(()=>{}); }, []);
+  const run = (fn) => async () => {
+    setBusy(true);
+    try { const r = await fn(); if (r && 'dir' in r) setSt({ dir: r.dir, last: r.last }); }
+    catch (err) { console.warn('[backup]', err); }
+    finally { setBusy(false); }
+  };
+  const when = (iso) => { try { return new Date(iso).toLocaleString(); } catch { return iso; } };
+  const last = st.last;
+  const status = !st.dir ? 'Off — choose a folder your cloud client syncs (e.g. inside Google Drive).'
+    : !last ? 'Runs at startup and at quit.'
+    : last.ok ? `Last backup ${when(last.at)} (${last.reason}${last.changed ? ', new history copy' : ''}).`
+    : `Last attempt ${when(last.at)} failed: ${last.error}`;
+  return (
+    <Fragment>
+      <Label>Automatic backup</Label>
+      <div data-auto-backup style={{fontSize:12, lineHeight:1.45}}>
+        <div data-auto-backup-dir title={st.dir || ''} style={{
+          fontFamily:'ui-monospace, monospace', fontSize:11, opacity: st.dir ? .9 : .6,
+          whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis', direction:'rtl', textAlign:'left',
+        }}>{st.dir ? <bdi>{st.dir}</bdi> : 'No folder chosen'}</div>
+        <div data-auto-backup-status style={{opacity:.7, marginTop:4, color: last && !last.ok ? '#c33' : 'inherit'}}>{status}</div>
+        <div style={{display:'flex', gap:4, marginTop:6, flexWrap:'wrap'}}>
+          <PanelButton T={T} disabled={busy} onClick={run(api.choose)}>{st.dir ? 'Change folder…' : 'Choose folder…'}</PanelButton>
+          {st.dir && <PanelButton T={T} disabled={busy} onClick={run(api.now)}>Back up now</PanelButton>}
+          {st.dir && <PanelButton T={T} disabled={busy} onClick={run(api.clear)}>Turn off</PanelButton>}
+        </div>
+      </div>
+    </Fragment>
+  );
+}
+function PanelButton({T, onClick, disabled, children}) {
+  return (
+    <button onClick={onClick} disabled={disabled} {...hoverProps(T)} style={{
+      padding:'5px 9px', fontSize:12, borderRadius:6, cursor: disabled ? 'default' : 'pointer',
+      background:'transparent', border:`1px solid ${T.panelBorder}`, color:T.panelText, font:'inherit',
+      opacity: disabled ? .5 : 1,
+    }}>{children}</button>
   );
 }
 // A full-width text row inside the Preferences panel — the menu bar is

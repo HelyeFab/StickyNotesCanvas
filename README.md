@@ -157,6 +157,17 @@ Launch from Spotlight (`Cmd+Space` → "Sticky Notes") or from Launchpad. To uni
 
 The JSON format is identical across all three — copy the file from one machine to another and your notes come with it.
 
+### Automatic backup to a folder (this fork)
+
+**Preferences → Automatic backup → Choose folder…** Pick any folder — the point is to pick one a cloud client already syncs (Google Drive via Insync, Dropbox, Nextcloud, …), so your notes reach the cloud without the app talking to any service itself. The app then writes, **at startup and at quit**:
+
+| File | What |
+|---|---|
+| `sticky-notes-backup.json` | the latest state, in exactly the format **Backup ▾ → Save backup…** produces, pictures included — **Restore backup…** reads it as-is |
+| `history/sticky-notes-YYYY-MM-DD_HHMMSS.json` | a dated copy every time the state actually changed (the 30 newest are kept) |
+
+The dated copies are the safety net: a note deleted by mistake is still in an earlier file even after the latest backup has faithfully recorded the deletion. "Back up now" runs it on demand; the panel shows when it last ran and whether that worked. The setting is per machine (`sync.json` next to `notes.json`) and nothing is ever read back from the folder automatically.
+
 ---
 
 ## Pokémon (this fork)

@@ -55,6 +55,16 @@ contextBridge.exposeInMainWorld('stickyAPI', {
   ttsSpeak: (text) => ipcRenderer.invoke('tts:speak', text),
   ttsWarm: () => ipcRenderer.invoke('tts:warm'),
 
+  // Automatic backup to a folder (Preferences → Automatic backup). Main
+  // writes the bundle at startup and at quit; these drive the settings.
+  // status() -> { dir, last: { at, reason, ok, error, changed } | null }
+  autoBackup: {
+    status: () => ipcRenderer.invoke('sync:status'),
+    choose: () => ipcRenderer.invoke('sync:choose-dir'),
+    clear:  () => ipcRenderer.invoke('sync:clear'),
+    now:    () => ipcRenderer.invoke('sync:now'),
+  },
+
   appVersion: ipcRenderer.sendSync('app:version-sync'),
   // True only on a genuine first install (no notes.json yet). Lets the
   // renderer skip the what's-new note for new users while still showing it
